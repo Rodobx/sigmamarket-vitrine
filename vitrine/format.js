@@ -492,15 +492,12 @@
   }
 
   /**
-   * Le lien qui ouvre l'application sur ce panier. Sur Android, un intent : Chrome ouvre
-   * SigmaMarket s'il est installé, sinon il revient à `retour` (cette page).
+   * L'intent qui ouvre l'application (Android seulement) sur sigmamarket://panier?p=… : Chrome
+   * ouvre SigmaMarket s'il est installé, sinon il revient à `retour` (cette page).
    */
-  function lienApplication(contenu, android, retour) {
-    if (android) {
-      return 'intent://panier?p=' + contenu + '#Intent;scheme=sigmamarket;package=' + PAQUET_ANDROID +
-        ';S.browser_fallback_url=' + encodeURIComponent(retour) + ';end';
-    }
-    return 'sigmamarket://panier?p=' + contenu;
+  function lienApplication(contenu, retour) {
+    return 'intent://panier?p=' + contenu + '#Intent;scheme=sigmamarket;package=' + PAQUET_ANDROID +
+      ';S.browser_fallback_url=' + encodeURIComponent(retour) + ';end';
   }
 
   /**

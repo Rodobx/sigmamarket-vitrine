@@ -985,6 +985,11 @@ return toQR;
     etat.panier.t = Date.now();
     try { window.localStorage.setItem(cleStockage(), JSON.stringify(etat.panier)); } catch (e) { /* navigation privée */ }
   }
+  /** Les paniers montrés par ce téléphone (leur identifiant) : rouvert ici, un panier n'est pas reçu. */
+  function faits() {
+    try { var f = JSON.parse(window.localStorage.getItem(STOCKAGE + 'faits')); if (Array.isArray(f)) return f; } catch (e) { /* rien */ }
+    return [];
+  }
   function lignes() {
     return F.lignesDuPanier(etat.cat, etat.panier.q);
   }
@@ -1133,6 +1138,8 @@ return toQR;
     etat.panier.montre = empreinte(l);
     etat.repris = false;
     garder();
+    var d = etat.panier.demande;
+    try { window.localStorage.setItem(STOCKAGE + 'faits', JSON.stringify(faits().filter(function (x) { return x !== d; }).concat(d).slice(-50))); } catch (e) { /* rien */ }
     etat.defile = window.pageYOffset || 0;
     try { history.pushState({ vitrine: 'panier' }, '', location.href); } catch (e) { /* rien */ }
     vuePanier();
@@ -1249,6 +1256,8 @@ return toQR;
     var prenom = F.prenomLisible(panier.prenom);
     var titre = prenom ? 'Panier de ' + prenom : 'Panier d’un client';
     document.title = titre;
+    // L'application n'existe que sur Android ; le client qui rouvre ici son panier ne l'a pas.
+    var appli = ANDROID && faits().indexOf(panier.demande) < 0;
     var zoneMessage = h('div');
     var copie = '';
     function ouvrir() {
@@ -1259,10 +1268,10 @@ return toQR;
       zoneMessage.appendChild(h('div', { class: 'bandeau ok', style: 'margin:12px 0 0' }, [
         h('div', { class: 'rang' }, [icone('coche'), copie]),
       ]));
-      setTimeout(function () { location.href = F.lienApplication(contenu, ANDROID, lien); }, 200);
+      setTimeout(function () { location.href = F.lienApplication(contenu, lien); }, 200);
     }
     app.appendChild(entete(titre, 'panier', null, function () {
-      return copie || titre + '. ' + articles(n) + '. Touche le bouton vert pour l’ouvrir dans SigmaMarket.';
+      return copie || titre + '. ' + articles(n) + (appli ? '. Touche le bouton vert pour l’ouvrir dans SigmaMarket.' : '. Montre ce code au vendeur.');
     }));
     app.appendChild(h('div', { class: 'carte' }, panier.lignes.map(function (x) {
       return h('div', { class: 'ligne' }, [
@@ -1275,12 +1284,12 @@ return toQR;
       h('div', { class: 'total-panier' }, [h('span', { class: 'combien' }, [articles(n)]), h('span', { class: 'montant' }, [montant(total)])]),
       h('p', { class: 'note' }, ['Prix vus par le client. Le prix de la vente, c’est le vendeur qui le décide.']),
     ])));
-    app.appendChild(h('div', { style: 'margin:12px 16px 0' }, [
+    if (appli) app.appendChild(h('div', { style: 'margin:12px 16px 0' }, [
       h('button', { class: 'bouton valider large geant', onclick: ouvrir }, [logo(), 'Ouvrir dans SigmaMarket']),
       zoneMessage,
     ]));
     app.appendChild(h('div', { class: 'carte' }, [
-      h('div', { class: 'titre-carte' }, [icone('telephone'), 'Ou montre ce code au vendeur']),
+      h('div', { class: 'titre-carte' }, [icone('telephone'), appli ? 'Ou montre ce code au vendeur' : 'Montre ce code au vendeur']),
       dessinQrSur(lien),
     ]));
     app.appendChild(h('p', { class: 'pied-page' }, ['SigmaMarket ne vérifie ni les boutiques ni les prix.']));
