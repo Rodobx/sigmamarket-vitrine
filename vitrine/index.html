@@ -1,0 +1,1340 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#1C1C56">
+<title>Vitrine</title>
+<!--
+  SigmaMarket · page du client de la vitrine (mode sans serveur).
+  Le catalogue arrive dans l'adresse (#c=…), le panier repart dans l'adresse (#p=…) : rien ne passe
+  par un serveur, aucun appel réseau (la règle de sécurité ci-dessus l'interdit au navigateur).
+  Formats : format.js, copie de src/domain/vitrine.ts, vérifiée par tests/domain/vitrine.test.ts.
+  ES2015, sans dépendance ; QR dessiné par toqr (MIT, licence plus bas).
+-->
+<style>
+:root{--creme:#FAF3E3;--ivoire:#FFFCF5;--blanc:#FFFFFF;--lin:#F1E6CF;--sable:#E7DAC0;--argile:#8F7757;--encre:#24160D;--encre-douce:#5A4634;--indigo:#2A2A78;--indigo-vif:#4141A0;--vert:#0B5F2F;--vert-clair:#DDF1DF;--rouge:#9E141A;--rouge-clair:#FBE3DE;--orange:#F28C16;--orange-fonce:#8A3C00;--orange-clair:#FDEBD0;--ombre-1:0 1px 3px rgba(36,22,13,.16);--ombre-2:0 3px 8px rgba(36,22,13,.22)}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:#FAF3E3;background:var(--creme);color:var(--encre);font:500 17px/22px system-ui,-apple-system,Roboto,'Segoe UI',sans-serif;font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;border:0;background:none;padding:0;margin:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+a{-webkit-tap-highlight-color:transparent}
+svg{display:block}
+.ico{width:24px;height:24px;fill:currentColor;flex:none}
+#app{max-width:480px;margin:0 auto;min-height:100vh;padding-bottom:24px}
+#app.avec-barre{padding-bottom:112px}
+.f{font-size:.62em;font-weight:700;margin-left:.16em}
+.cache{display:none!important}
+
+/* En-tête : indigo, coins bas arrondis, motif « disque » derrière le bouton d'écoute */
+.entete{position:relative;height:72px;display:flex;align-items:center;padding:0 8px;background:var(--indigo);border-radius:0 0 24px 24px;overflow:hidden;color:var(--ivoire)}
+.entete>*{position:relative}
+.entete>.motif{position:absolute;top:0;right:0;width:360px;height:72px}
+.avant{flex:none;width:64px;height:64px;display:flex;align-items:center;justify-content:center}
+.pastille{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:var(--indigo-vif);color:var(--ivoire)}
+.pastille .ico{width:28px;height:28px}
+.pastille.retour{background:var(--ivoire);color:var(--encre);box-shadow:0 2px 5px rgba(13,13,46,.4)}
+.titre{flex:1;min-width:0;margin:0 8px;font-size:20px;line-height:24px;font-weight:700;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
+.ecoute{flex:none;width:56px;height:56px;border-radius:28px;display:flex;align-items:center;justify-content:center;background:var(--ivoire);color:var(--indigo);box-shadow:0 2px 5px rgba(13,13,46,.4)}
+.ecoute .ico{width:30px;height:30px}
+.ecoute.parle{background:var(--indigo-vif);color:var(--ivoire)}
+
+/* Bandeaux et cartes */
+.bandeau{margin:12px 16px 0;padding:10px 12px;border-radius:16px;background:var(--ivoire);border:1px solid var(--sable);font-size:15px;line-height:20px;font-weight:600;color:var(--encre-douce)}
+.bandeau .rang{display:flex;align-items:center}
+.bandeau .rang+.rang{margin-top:6px}
+.bandeau .ico{margin-right:10px}
+.bandeau.vieux{background:var(--orange-clair);border:2px solid var(--orange);color:var(--encre)}
+.pas.plein{opacity:.38}
+.bandeau.ok{background:var(--vert-clair);border:2px solid var(--vert);color:var(--encre)}
+.bandeau.chrome{background:var(--orange-clair);border:2px solid var(--orange);color:var(--encre);padding:12px}
+.dessin-chrome{display:flex;align-items:center;justify-content:center;margin-bottom:10px}
+.dessin-chrome .rond{width:44px;height:44px;border-radius:22px;background:var(--ivoire);border:2px solid var(--encre);display:flex;align-items:center;justify-content:center}
+.dessin-chrome .fleche{margin:0 8px;color:var(--encre)}
+.carte{margin:12px 16px 0;padding:16px;background:var(--ivoire);border:1px solid var(--sable);border-radius:24px;box-shadow:var(--ombre-1)}
+.titre-carte{display:flex;align-items:center;font-size:20px;line-height:24px;font-weight:800}
+.titre-carte .ico{width:32px;height:32px;margin-right:10px}
+.note{margin:8px 0 0;font-size:15px;line-height:20px;color:var(--encre-douce)}
+
+/* La grille des articles : deux colonnes, des tuiles sans photo, le numéro en très grand */
+.grille{display:flex;flex-wrap:wrap;justify-content:space-between;padding:12px 16px 0}
+.tuile{position:relative;width:calc(50% - 6px);margin-bottom:12px;display:flex;flex-direction:column;background:var(--ivoire);border:1px solid var(--sable);border-radius:20px;overflow:hidden;box-shadow:var(--ombre-1)}
+.tuile.prise{box-shadow:0 0 0 3px var(--encre),var(--ombre-2)}
+.plaque{position:relative;height:96px;padding:0 12px 4px;background:var(--lin);display:flex;align-items:flex-end}
+.numero{font-size:52px;line-height:56px;font-weight:800;letter-spacing:-1px;white-space:nowrap}
+.numero .no{font-size:18px;font-weight:700;letter-spacing:0;margin-right:2px}
+.numero.long{font-size:40px}
+.numero.tres-long{font-size:32px}
+.tuile.epuise .numero{opacity:.4}
+.etiquette{position:absolute;top:0;right:0;height:32px;padding:0 10px 0 7px;display:flex;align-items:center;border-radius:0 0 0 14px;border:solid var(--ivoire);border-width:0 0 2px 2px;font-size:13px;line-height:16px;font-weight:800;white-space:nowrap}
+.etiquette .ico{width:18px;height:18px;margin-right:4px}
+.etiquette.disponible{background:var(--vert);color:var(--blanc)}
+.etiquette.bientot_fini{background:var(--orange);color:var(--encre)}
+.etiquette.epuise{background:var(--rouge);color:var(--blanc)}
+.corps{flex:1;padding:8px 12px 0}
+.prix{font-size:22px;line-height:26px;font-weight:800;white-space:nowrap}
+.prix.a-demander{font-size:15px;line-height:26px;color:var(--encre-douce)}
+.nom{margin-top:2px;font-size:14px;line-height:18px;color:var(--encre-douce);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word;min-height:36px}
+.compteur{display:flex;align-items:center;justify-content:space-between;padding:8px 6px 6px}
+.pas{width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center}
+.pas .ico{width:32px;height:32px}
+.pas.plus{background:var(--encre);color:var(--ivoire);box-shadow:var(--ombre-2)}
+.pas.moins{background:var(--ivoire);border:3px solid var(--encre);color:var(--encre)}
+.pas.large{width:100%}
+.pas[disabled]{opacity:.38;box-shadow:none}
+.qte{flex:1;min-width:0;text-align:center;font-size:30px;line-height:34px;font-weight:800}
+.qte.long{font-size:24px}
+.qte.tres-long{font-size:18px}
+.vide{padding:24px 16px;text-align:center;color:var(--encre-douce)}
+
+/* Barre du bas : le panier en cours et Valider */
+.barre{position:fixed;left:0;right:0;bottom:0;z-index:2;background:var(--ivoire);border-top:1px solid var(--sable);box-shadow:0 -2px 8px rgba(36,22,13,.12);padding:12px 16px;padding-bottom:calc(12px + env(safe-area-inset-bottom))}
+.barre-dedans{max-width:448px;margin:0 auto;display:flex;align-items:center}
+.resume{flex:1;min-width:0;display:flex;align-items:center}
+.rond-panier{position:relative;flex:none;width:52px;height:52px;border-radius:26px;background:var(--lin);display:flex;align-items:center;justify-content:center;margin-right:10px}
+.rond-panier .ico{width:30px;height:30px}
+.pastille-nombre{position:absolute;top:-4px;right:-6px;min-width:26px;height:26px;padding:0 6px;border-radius:13px;background:var(--encre);color:var(--ivoire);border:2px solid var(--ivoire);font-size:14px;line-height:22px;font-weight:800;text-align:center}
+.resume-texte{min-width:0}
+.resume-texte .petit{display:block;font-size:14px;line-height:18px;font-weight:600;color:var(--encre-douce);white-space:nowrap}
+.resume-texte .total{display:block;font-size:26px;line-height:30px;font-weight:800;white-space:nowrap}
+.resume-texte .aide{display:block;font-size:16px;line-height:20px;font-weight:700}
+
+/* Boutons */
+.bouton{height:64px;padding:0 20px;border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:18px;line-height:22px;font-weight:700;white-space:nowrap;text-decoration:none}
+.bouton .ico{width:30px;height:30px;margin-right:8px}
+.bouton .ico.logo{width:42px;height:42px;margin-right:10px}
+.bouton.valider{background:var(--vert);color:var(--blanc);box-shadow:var(--ombre-2)}
+.bouton.neutre{background:var(--ivoire);border:3px solid var(--encre);color:var(--encre)}
+.bouton.annuler{background:var(--rouge-clair);border:3px solid var(--rouge);color:var(--rouge)}
+.bouton.large{width:100%}
+.bouton.geant{height:72px;font-size:20px}
+.bouton[disabled]{opacity:.38;box-shadow:none}
+.rangee{display:flex;margin-top:12px}
+.rangee>.bouton{flex:1;min-width:0;padding:0 8px;font-size:16px}
+.rangee>.bouton .ico{width:26px;height:26px;margin-right:6px}
+.rangee>.bouton+.bouton{margin-left:12px}
+.espace{margin-top:12px}
+
+/* Écran du panier */
+.qr{margin:12px auto 0;width:100%;max-width:300px;padding:0;background:var(--blanc);border-radius:12px;border:1px solid var(--sable)}
+.qr svg{width:100%;height:auto}
+.total-panier{display:flex;align-items:baseline;justify-content:space-between;margin-top:12px}
+.total-panier .combien{font-size:17px;font-weight:700;color:var(--encre-douce)}
+.total-panier .montant{font-size:36px;line-height:42px;font-weight:800;white-space:nowrap}
+.ligne{display:flex;align-items:center;padding:8px 0;border-top:1px solid var(--sable)}
+.ligne:first-child{border-top:0}
+.badge{flex:none;min-width:48px;height:40px;padding:0 6px;margin-right:10px;border-radius:12px;background:var(--lin);font-size:20px;line-height:40px;font-weight:800;text-align:center}
+.ligne-nom{flex:1;min-width:0;font-size:16px;line-height:20px;font-weight:600;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
+.ligne-qte{flex:none;margin:0 10px;font-size:20px;font-weight:800}
+.ligne-prix{flex:none;font-size:17px;font-weight:800;white-space:nowrap}
+.champ{display:flex;align-items:center;height:64px;margin-top:12px;padding:0 14px;border:2px solid var(--argile);border-radius:20px;background:var(--ivoire)}
+.champ .ico{color:var(--encre-douce);margin-right:10px}
+.champ input{flex:1;min-width:0;height:56px;border:0;background:none;font:inherit;font-size:18px;color:var(--encre);outline:none}
+.erreur{margin:48px 16px 0;text-align:center}
+.rond-erreur{width:96px;height:96px;margin:0 auto 16px;border-radius:48px;background:var(--rouge-clair);color:var(--rouge);display:flex;align-items:center;justify-content:center}
+.rond-erreur.neutre{background:var(--lin);color:var(--encre)}
+.rond-erreur .ico{width:52px;height:52px}
+.erreur h1{margin:0 0 8px;font-size:22px;line-height:28px;font-weight:800}
+.erreur p{margin:0;font-size:17px;line-height:22px;color:var(--encre-douce)}
+.pied-page{margin:20px 16px 0;font-size:13px;line-height:18px;color:var(--encre-douce);text-align:center}
+noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text-align:center}
+</style>
+</head>
+<body>
+<noscript><p>Cette page a besoin de JavaScript. Ouvre ce lien avec Chrome.</p></noscript>
+<div id="app"></div>
+<script src="format.js"></script>
+<script>
+// Sans TextEncoder (Edge 18, Safari iOS 10.0-10.2), toqr ne se charge pas : un remplaçant UTF-8.
+if (typeof TextEncoder === 'undefined') window.TextEncoder = function () {
+  this.encode = function (t) {
+    var s = unescape(encodeURIComponent(t)), o = new Uint8Array(s.length);
+    for (var i = 0; i < s.length; i++) o[i] = s.charCodeAt(i);
+    return o;
+  };
+};
+</script>
+<script>
+/*! toqr 0.1.1 : encodeur de QR (https://github.com/kitten/toqr), recopié tel quel.
+ * MIT License
+ *
+ * Copyright (c) Phil Pluckthun,
+ * Copyright (c) 650 Industries, Inc. (aka Expo),
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+var toQR = (function () {
+const t = new Uint8Array(512);
+
+const n = new Uint8Array(256);
+
+for (let e = 0, o = 1; e < 255; e++) {
+  t[e] = o;
+  n[o] = e;
+  o <<= 1;
+  if (256 & o) {
+    o ^= 285;
+  }
+}
+
+for (let n = 255; n < 512; n++) {
+  t[n] = t[n - 255];
+}
+
+const gmul = (e, o) => e > 0 && o > 0 ? t[n[e] + n[o]] : 0;
+
+const gpow = (e, o) => t[o * n[e] % 255];
+
+const genRS = t => {
+  const n = new Uint8Array(t + 2);
+  const e = new Uint8Array(t + 1);
+  e[0] = 1;
+  for (let o = 0; o < t; o++) {
+    const t = gpow(2, o);
+    n.fill(0, 0, o + 2);
+    for (let s = 0; s < o + 1; s++) {
+      n[s] ^= e[s];
+      n[s + 1] ^= gmul(e[s], t);
+    }
+    for (let t = 0; t < o + 2; t++) {
+      e[t] = n[t];
+    }
+  }
+  return e;
+};
+
+const encodeRS = (t, n) => {
+  const e = genRS(n);
+  const o = new Uint8Array(t.byteLength + e.byteLength - 1);
+  o.set(t);
+  for (let n = 0; n < t.byteLength; n++) {
+    const t = o[n];
+    if (t) {
+      for (let s = 1; s < e.byteLength; s++) {
+        o[n + s] ^= gmul(e[s], t);
+      }
+    }
+  }
+  return o.subarray(t.byteLength);
+};
+
+const e = [ 0, 26, 44, 70, 100, 134, 172, 196, 242, 292, 346, 404, 466, 532, 581, 655, 733, 815, 901, 991, 1085, 1156, 1258, 1364, 1474, 1588, 1706, 1828, 1921, 2051, 2185, 2323, 2465, 2611, 2761, 2876, 3034, 3196, 3362, 3532, 3706 ];
+
+const o = [ [ 0, 0, 0, 0 ], [ 10, 7, 17, 13 ], [ 16, 10, 28, 22 ], [ 26, 15, 44, 36 ], [ 36, 20, 64, 52 ], [ 48, 26, 88, 72 ], [ 64, 36, 112, 96 ], [ 72, 40, 130, 108 ], [ 88, 48, 156, 132 ], [ 110, 60, 192, 160 ], [ 130, 72, 224, 192 ], [ 150, 80, 264, 224 ], [ 176, 96, 308, 260 ], [ 198, 104, 352, 288 ], [ 216, 120, 384, 320 ], [ 240, 132, 432, 360 ], [ 280, 144, 480, 408 ], [ 308, 168, 532, 448 ], [ 338, 180, 588, 504 ], [ 364, 196, 650, 546 ], [ 416, 224, 700, 600 ], [ 442, 224, 750, 644 ], [ 476, 252, 816, 690 ], [ 504, 270, 900, 750 ], [ 560, 300, 960, 810 ], [ 588, 312, 1050, 870 ], [ 644, 336, 1110, 952 ], [ 700, 360, 1200, 1020 ], [ 728, 390, 1260, 1050 ], [ 784, 420, 1350, 1140 ], [ 812, 450, 1440, 1200 ], [ 868, 480, 1530, 1290 ], [ 924, 510, 1620, 1350 ], [ 980, 540, 1710, 1440 ], [ 1036, 570, 1800, 1530 ], [ 1064, 570, 1890, 1590 ], [ 1120, 600, 1980, 1680 ], [ 1204, 630, 2100, 1770 ], [ 1260, 660, 2220, 1860 ], [ 1316, 720, 2310, 1950 ], [ 1372, 750, 2430, 2040 ] ];
+
+const s = [ [ 0, 0, 0, 0 ], [ 1, 1, 1, 1 ], [ 1, 1, 1, 1 ], [ 1, 1, 2, 2 ], [ 2, 1, 4, 2 ], [ 2, 1, 4, 4 ], [ 4, 2, 4, 4 ], [ 4, 2, 5, 6 ], [ 4, 2, 6, 6 ], [ 5, 2, 8, 8 ], [ 5, 4, 8, 8 ], [ 5, 4, 11, 8 ], [ 8, 4, 11, 10 ], [ 9, 4, 16, 12 ], [ 9, 4, 16, 16 ], [ 10, 6, 18, 12 ], [ 10, 6, 16, 17 ], [ 11, 6, 19, 16 ], [ 13, 6, 21, 18 ], [ 14, 7, 25, 21 ], [ 16, 8, 25, 20 ], [ 17, 8, 25, 23 ], [ 17, 9, 34, 23 ], [ 18, 9, 30, 25 ], [ 20, 10, 32, 27 ], [ 21, 12, 35, 29 ], [ 23, 12, 37, 34 ], [ 25, 12, 40, 34 ], [ 26, 13, 42, 35 ], [ 28, 14, 45, 38 ], [ 29, 15, 48, 40 ], [ 31, 16, 51, 43 ], [ 33, 17, 54, 45 ], [ 35, 18, 57, 48 ], [ 37, 19, 60, 51 ], [ 38, 19, 63, 53 ], [ 40, 20, 66, 56 ], [ 43, 21, 70, 59 ], [ 45, 22, 74, 62 ], [ 47, 24, 77, 65 ], [ 49, 25, 81, 68 ] ];
+
+const r = [ 0, 21, 25, 29, 33, 37, 41, 45, 49, 53, 57, 61, 65, 69, 73, 77, 81, 85, 89, 93, 97, 101, 105, 109, 113, 117, 121, 125, 129, 133, 137, 141, 145, 149, 153, 157, 161, 165, 169, 173, 177 ];
+
+const c = [ [], [], [ 4, 16 ], [ 4, 20 ], [ 4, 24 ], [ 4, 28 ], [ 4, 32 ], [ 4, 20, 36 ], [ 4, 22, 40 ], [ 4, 24, 44 ], [ 4, 26, 48 ], [ 4, 28, 52 ], [ 4, 30, 56 ], [ 4, 32, 60 ], [ 4, 24, 44, 64 ], [ 4, 24, 46, 68 ], [ 4, 24, 48, 72 ], [ 4, 28, 52, 76 ], [ 4, 28, 54, 80 ], [ 4, 28, 56, 84 ], [ 4, 32, 60, 88 ], [ 4, 26, 48, 70, 92 ], [ 4, 24, 48, 72, 96 ], [ 4, 28, 52, 76, 100 ], [ 4, 26, 52, 78, 104 ], [ 4, 30, 56, 82, 108 ], [ 4, 28, 56, 84, 112 ], [ 4, 32, 60, 88, 116 ], [ 4, 24, 48, 72, 96, 120 ], [ 4, 28, 52, 76, 100, 124 ], [ 4, 24, 50, 76, 102, 128 ], [ 4, 28, 54, 80, 106, 132 ], [ 4, 32, 58, 84, 110, 136 ], [ 4, 28, 56, 84, 112, 140 ], [ 4, 32, 60, 88, 116, 144 ], [ 4, 28, 52, 76, 100, 124, 148 ], [ 4, 22, 48, 74, 100, 126, 152 ], [ 4, 26, 52, 78, 104, 130, 156 ], [ 4, 30, 56, 82, 108, 134, 160 ], [ 4, 24, 52, 80, 108, 136, 164 ], [ 4, 28, 56, 84, 112, 140, 168 ] ];
+
+const makeSegments = (t, n, s) => {
+  const r = e[n] - o[n][s];
+  const c = new Uint8Array(r);
+  let f = 0;
+  let l = 0;
+  if (n > 9) {
+    const n = 65535 & t.byteLength;
+    c[0] = 64 | n >>> 12 & 15;
+    c[1] = n >>> 4 & 255;
+    f = (15 & n) << 4;
+    l = 2;
+  } else {
+    const n = 255 & t.byteLength;
+    c[0] = 64 | n >>> 4 & 15;
+    f = (15 & n) << 4;
+    l = 1;
+  }
+  let i = 0;
+  while (i + 1 < t.byteLength) {
+    const n = t[i++] << 8 | t[i++];
+    c[l++] = f | n >>> 12;
+    c[l++] = n >>> 4 & 255;
+    f = n << 4 & 240;
+  }
+  if (i < t.byteLength) {
+    c[l++] = f | t[i] >>> 4;
+    f = t[i] << 4 & 240;
+  }
+  c[l++] = f;
+  for (let t = 0; l < r; t++) {
+    c[l++] = 1 & t ? 17 : 236;
+  }
+  return c;
+};
+
+const getBestVersion = (t, n) => {
+  for (let s = 1; s <= 40; s++) {
+    let r = e[s] - o[s][n];
+    r -= s > 9 ? 3 : 2;
+    if (r >= t.byteLength) {
+      return s;
+    }
+  }
+  throw new RangeError("Bytes exceed max length");
+};
+
+const encodeData = (t, n, e) => {
+  const r = t.byteLength + o[n][e];
+  const c = s[n][e];
+  const f = c - r % c;
+  const l = t.byteLength / c | 0;
+  const i = (r / c | 0) - l;
+  const y = t.byteLength;
+  const h = new Uint8Array(r);
+  for (let n = 0, e = 0; n < c; n++) {
+    const o = n < f ? l : l + 1;
+    const s = encodeRS(t.subarray(e, e + o), i);
+    for (let s = 0; s < o; s++) {
+      h[s < l ? s * c + n : l * c + (n - f)] = t[e + s];
+    }
+    for (let t = 0; t < i; t++) {
+      h[y + t * c + n] = s[t];
+    }
+    e += o;
+  }
+  return h;
+};
+
+const setSquare = (t, n, e, o, s) => {
+  const r = (e + s) * n;
+  for (let c = e * n; c < r; c += n) {
+    t.fill(1, c + o, c + o + s);
+  }
+};
+
+const setPattern = (t, n, e, o, s) => {
+  const r = e * n + o;
+  for (let e = 0; e < s; e++) {
+    for (let o = 0; o < s; o++) {
+      const c = o < s - 1 - o ? o : s - 1 - o;
+      const f = e < s - 1 - e ? e : s - 1 - e;
+      t[r + e * n + o] = 1 !== (c < f ? c : f) ? 1 : 0;
+    }
+  }
+};
+
+const writeFinderPatterns = (t, n, e) => {
+  const o = e - 7;
+  setPattern(t, e, 0, 0, 7);
+  setPattern(t, e, o, 0, 7);
+  setPattern(t, e, 0, o, 7);
+  setSquare(n, e, 0, 0, 8);
+  setSquare(n, e, o - 1, 0, 8);
+  setSquare(n, e, 0, o - 1, 8);
+};
+
+const writeAlignmentPatterns = (t, n, e, o) => {
+  const s = c[o];
+  for (let o = 0; o < s.length; o++) {
+    const r = s[o];
+    for (let c = 0; c < s.length; c++) {
+      if ((o || c % (s.length - 1)) && (c || o % (s.length - 1))) {
+        const o = s[c];
+        setPattern(t, e, r, o, 5);
+        setSquare(n, e, r, o, 5);
+      }
+    }
+  }
+};
+
+const writeTimingPatterns = (t, n, e) => {
+  const o = e - 7;
+  for (let s = 8; s < o; s++) {
+    const o = s * e + 6;
+    if (!n[o]) {
+      n[o] = 1;
+      t[o] = (s + 1) % 2;
+    }
+    const r = 6 * e + s;
+    if (!n[r]) {
+      n[r] = 1;
+      t[r] = (s + 1) % 2;
+    }
+  }
+};
+
+const reserveFormatInfo = (t, n) => {
+  const e = n - 7 - 1;
+  t[8 * n + 8] = 1;
+  for (let o = 0; o < 8; o++) {
+    t[o * n + 8] = 1;
+    t[8 * n + o] = 1;
+    t[(e + o) * n + 8] = 1;
+    t[8 * n + e + o] = 1;
+  }
+};
+
+const reserveVersionInfo = (t, n, e) => {
+  if (e >= 7) {
+    const e = n - 7 - 4;
+    for (let o = 0; o < 6; o++) {
+      for (let s = 0; s < 3; s++) {
+        t[(e + s) * n + o] = 1;
+        t[o * n + e + s] = 1;
+      }
+    }
+  }
+};
+
+const writeData = (t, n, e, o) => {
+  let s = 0;
+  let r = e - 1;
+  let c = -1;
+  let f = 7;
+  while (s < o.byteLength) {
+    if (6 === r) {
+      r--;
+    }
+    for (let l = 0; l < e; l++) {
+      for (let i = 0; i < 2; i++) {
+        const y = r - i;
+        const h = -1 === c ? e - l - 1 : l;
+        if (n[h * e + y]) {
+          continue;
+        }
+        t[h * e + y] = o[s] >>> f & 1;
+        if (0 === f--) {
+          f = 7;
+          if (++s >= o.byteLength) {
+            return;
+          }
+        }
+      }
+    }
+    c = -c;
+    r -= 2;
+  }
+};
+
+const xorPatternN0 = (t, n, e) => {
+  for (let o = 0, s = 0; o < e; o++, s += e) {
+    for (let r = 0; r < e; r++) {
+      const e = s + r;
+      if (!(n[e] || o + r & 1)) {
+        t[e] ^= 1;
+      }
+    }
+  }
+};
+
+const xorPatternN1 = (t, n, e) => {
+  for (let o = 0, s = 0; o < e; o++, s += e) {
+    for (let r = 0; r < e; r++) {
+      const e = s + r;
+      if (!(n[e] || 1 & o)) {
+        t[e] ^= 1;
+      }
+    }
+  }
+};
+
+const xorPatternN2 = (t, n, e) => {
+  for (let o = 0, s = 0; o < e; o++, s += e) {
+    for (let o = 0; o < e; o++) {
+      const e = s + o;
+      if (!n[e] && o % 3 == 0) {
+        t[e] ^= 1;
+      }
+    }
+  }
+};
+
+const xorPatternN3 = (t, n, e) => {
+  for (let o = 0, s = 0; o < e; o++, s += e) {
+    for (let r = 0; r < e; r++) {
+      const e = s + r;
+      if (!n[e] && (o + r) % 3 == 0) {
+        t[e] ^= 1;
+      }
+    }
+  }
+};
+
+const xorPatternN4 = (t, n, e) => {
+  for (let o = 0, s = 0; o < e; o++, s += e) {
+    const r = o / 2 | 0;
+    for (let o = 0; o < e; o++) {
+      const e = s + o;
+      if (!(n[e] || r + (o / 3 | 0) & 1)) {
+        t[e] ^= 1;
+      }
+    }
+  }
+};
+
+const xorPatternN5 = (t, n, e) => {
+  for (let o = 0, s = 0; o < e; o++, s += e) {
+    for (let r = 0; r < e; r++) {
+      const e = s + r;
+      const c = o * r;
+      if (!n[e] && (1 & c) + c % 3 == 0) {
+        t[e] ^= 1;
+      }
+    }
+  }
+};
+
+const xorPatternN6 = (t, n, e) => {
+  for (let o = 0, s = 0; o < e; o++, s += e) {
+    for (let r = 0; r < e; r++) {
+      const e = s + r;
+      const c = o * r;
+      if (!n[e] && ((1 & c) + c % 3) % 2 == 0) {
+        t[e] ^= 1;
+      }
+    }
+  }
+};
+
+const xorPatternN7 = (t, n, e) => {
+  for (let o = 0, s = 0; o < e; o++, s += e) {
+    for (let r = 0; r < e; r++) {
+      const e = s + r;
+      if (!(n[e] || o * r % 3 + (o + r & 1) & 1)) {
+        t[e] ^= 1;
+      }
+    }
+  }
+};
+
+const xorPattern = (t, n, e, o) => {
+  switch (o) {
+   case 0:
+    return xorPatternN0(t, n, e);
+
+   case 1:
+    return xorPatternN1(t, n, e);
+
+   case 2:
+    return xorPatternN2(t, n, e);
+
+   case 3:
+    return xorPatternN3(t, n, e);
+
+   case 4:
+    return xorPatternN4(t, n, e);
+
+   case 5:
+    return xorPatternN5(t, n, e);
+
+   case 6:
+    return xorPatternN6(t, n, e);
+
+   case 7:
+    return xorPatternN7(t, n, e);
+  }
+};
+
+const computePenalty = (t, n) => {
+  let e = 0;
+  let o = 0;
+  for (let s = 0; s < n; s++) {
+    let r = 1;
+    let c = 1;
+    let f = 0;
+    let l = 0;
+    for (let i = 0; i < n; i++) {
+      const y = s * n + i;
+      const h = i * n + s;
+      o += t[y];
+      if (i > 0) {
+        if (t[y - 1] === t[y]) {
+          r++;
+        } else {
+          if (r >= 5) {
+            e += r - 5 + 3;
+          }
+          r = 1;
+        }
+        if (t[h - n] === t[h]) {
+          c++;
+        } else {
+          if (c >= 5) {
+            e += c - 5 + 3;
+          }
+          c = 1;
+        }
+      }
+      if (s < n - 1 && i < n - 1 && t[y] === t[y + 1] && t[y] === t[y + n] && t[y] === t[y + n + 1]) {
+        e += 3;
+      }
+      f = f << 1 & 2047 | t[y];
+      l = l << 1 & 2047 | t[h];
+      if (i >= 10) {
+        if (1488 === f || 93 === f) {
+          e += 40;
+        }
+        if (1488 === l || 93 === l) {
+          e += 40;
+        }
+      }
+    }
+    if (r >= 5) {
+      e += r - 5 + 3;
+    }
+    if (c >= 5) {
+      e += c - 5 + 3;
+    }
+  }
+  const s = 100 * Math.abs(o / t.byteLength - .5);
+  e += 10 * Math.floor(s / 5);
+  return e;
+};
+
+const applyBestPattern = (t, n, e) => {
+  let o = 0;
+  let s = 0;
+  const r = new Uint8Array(t.byteLength);
+  for (let c = 0; c <= 7; c += 1) {
+    r.set(t);
+    xorPattern(r, n, e, c);
+    const f = computePenalty(r, e);
+    if (0 === c || f < o) {
+      o = f;
+      s = c;
+    }
+  }
+  xorPattern(t, n, e, s);
+  return s;
+};
+
+const encodeFormatInfo = (t, n) => {
+  const e = (t << 3 | n) << 10;
+  let o = e;
+  for (let t = 0; t < 5; t++) {
+    if (o & 1 << 14 - t) {
+      o ^= 1335 << 4 - t;
+    }
+  }
+  return 21522 ^ (o | e);
+};
+
+const writeFormatInfo = (t, n, e, o) => {
+  const s = encodeFormatInfo(e, o);
+  let r = 14;
+  for (let e = 0; e < 6; e++) {
+    t[8 * n + e] = s >> r-- & 1;
+  }
+  t[8 * n + 7] = s >> r-- & 1;
+  t[8 * n + 8] = s >> r-- & 1;
+  t[7 * n + 8] = s >> r-- & 1;
+  for (let e = 0; e < 6; e++) {
+    t[(5 - e) * n + 8] = s >> r-- & 1;
+  }
+  r = 14;
+  for (let e = 0; e < 7; e++) {
+    t[(n - 1 - e) * n + 8] = s >> r-- & 1;
+  }
+  t[(n - 8) * n + 8] = 1;
+  for (let e = 0; e < 8; e++) {
+    t[8 * n + n - 8 + e] = s >> r-- & 1;
+  }
+};
+
+const encodeVersionInfo = t => {
+  const n = t << 12;
+  let e = n;
+  for (let t = 0; t < 6; t++) {
+    if (e & 1 << 17 - t) {
+      e ^= 7973 << 5 - t;
+    }
+  }
+  return e | n;
+};
+
+const writeVersionInfo = (t, n, e) => {
+  if (e >= 7) {
+    const o = encodeVersionInfo(e);
+    for (let e = 0; e < 6; e++) {
+      for (let s = 0; s < 3; s++) {
+        const r = o >>> 3 * e + s & 1;
+        t[(n - 11 + s) * n + e] = r;
+        t[e * n + n - 11 + s] = r;
+      }
+    }
+  }
+};
+
+const encodeBytes = (t, n) => {
+  const e = getBestVersion(t, n);
+  const o = makeSegments(t, e, n);
+  const s = encodeData(o, e, n);
+  const c = r[e];
+  const f = new Uint8Array(c * c);
+  const l = new Uint8Array(c * c);
+  writeFinderPatterns(f, l, c);
+  writeAlignmentPatterns(f, l, c, e);
+  writeTimingPatterns(f, l, c);
+  reserveFormatInfo(l, c);
+  reserveVersionInfo(l, c, e);
+  writeData(f, l, c, s);
+  const i = applyBestPattern(f, l, c);
+  writeFormatInfo(f, c, n, i);
+  writeVersionInfo(f, c, e);
+  return f;
+};
+
+const f = new TextEncoder;
+
+const toQR = (t, n = 1) => {
+  const e = "string" == typeof t ? f.encode(t) : t;
+  return encodeBytes(e, n);
+};
+
+return toQR;
+})();
+</script>
+<script>
+(function () {
+  'use strict';
+  var F = window.VitrineFormat;
+  var NS = 'http://www.w3.org/2000/svg';
+  var app = document.getElementById('app');
+  var STOCKAGE = 'sigmamarket.vitrine.';
+  var DUREE_PANIER = 24 * 3600 * 1000;
+  var ANDROID = /Android/i.test(navigator.userAgent);
+  var VOIX = typeof window.speechSynthesis !== 'undefined' && typeof window.SpeechSynthesisUtterance !== 'undefined';
+  var GARDE = 'SigmaMarket ne vérifie ni les boutiques ni les prix. Ne paie qu’en main propre, ou à un numéro que tu connais.';
+
+  // Dessins (24 x 24), faits pour cette page : un dessin, un sens.
+  var DESSINS = {
+    plus: 'M10.5 3.5h3v7h7v3h-7v7h-3v-7h-7v-3h7z',
+    moins: 'M3.5 10.5h17v3h-17z',
+    coche: 'M3.3 12.6l2.2-2.2 4 4 9-9 2.2 2.2L9.5 18.8z',
+    alerte: 'M12 2.5L1.5 21h21zm-1.4 6.5h2.8v6h-2.8zm0 7.6h2.8v2.6h-2.8z',
+    epuise: 'M12 2a10 10 0 100 20 10 10 0 000-20zm0 3a7 7 0 015.6 11.2L7.8 6.4A7 7 0 0112 5zm-7 7c0-1.6.5-3 1.4-4.2l9.8 9.8A7 7 0 015 12z',
+    ecoute: 'M3 9v6h4l5 5V4L7 9zm13.5 3A4.5 4.5 0 0014 8v8a4.5 4.5 0 002.5-4zM14 3.2v2.1a7 7 0 010 13.4v2.1a9 9 0 000-17.6z',
+    retour: 'M20 10.5H8.6l5.2-5.2L11.7 3.2 2.9 12l8.8 8.8 2.1-2.1-5.2-5.2H20z',
+    panier: 'M5.6 8.5L9.2 3l1.7 1.1-2.9 4.4h8l-2.9-4.4L14.8 3l3.6 5.5H22l-2.2 11c-.2 1-1 1.5-2 1.5H6.2c-1 0-1.8-.5-2-1.5L2 8.5zM7 11.5v6h2v-6zm4 0v6h2v-6zm4 0v6h2v-6z',
+    sac: 'M5.2 7.5h13.6l1.2 13.5H4zM8.5 7.5V7a3.5 3.5 0 017 0v.5h-2.2V7a1.3 1.3 0 00-2.6 0v.5z',
+    horloge: 'M12 2a10 10 0 100 20 10 10 0 000-20zm0 2.5a7.5 7.5 0 110 15 7.5 7.5 0 010-15zM10.8 7h2.4v4.4l3.4 2-1.2 2.1-4.6-2.7z',
+    etiquette: 'M2.5 3.5v7.6l10.4 10.4 8.6-8.6L11.1 2.5H3.5zm4.5 2a2 2 0 110 4 2 2 0 010-4z',
+    telephone: 'M7.5 1.5h9c1.1 0 2 .9 2 2v17c0 1.1-.9 2-2 2h-9c-1.1 0-2-.9-2-2v-17c0-1.1.9-2 2-2zM8 4.5v14h8v-14z',
+    personne: 'M12 12a4.5 4.5 0 100-9 4.5 4.5 0 000 9zm0 2c-4.4 0-8 2.2-8 5v2h16v-2c0-2.8-3.6-5-8-5z',
+    recommencer: 'M12.5 7.5c-2.6 0-5 1-6.8 2.6L2.5 7v9h9l-3.4-3.4a7.5 7.5 0 0112 3.4l2.6-.9A10.4 10.4 0 0012.5 7.5z',
+    whatsapp: 'M12 2.2a9.8 9.8 0 00-8.5 14.7L2.2 21.8l5-1.3A9.8 9.8 0 1012 2.2zm0 1.9a7.9 7.9 0 11-4 14.7l-.3-.2-3 .8.8-2.9-.2-.3A7.9 7.9 0 0112 4.1zM8.9 7.4c-.2 0-.6 0-.9.4-.3.3-1.1 1.1-1.1 2.7s1.2 3.1 1.3 3.3c.2.2 2.3 3.6 5.6 4.9 2.8 1.1 3.3.9 4 .8.6-.1 1.9-.8 2.2-1.6.3-.8.3-1.4.2-1.6l-.6-.4-2-1c-.3-.1-.5-.1-.7.1l-.9 1.2c-.2.2-.3.2-.6.1-.3-.1-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.5-.5.3-.5v-.5l-.9-2.3c-.2-.6-.5-.5-.7-.5z',
+    points: 'M12 4a2 2 0 110 4 2 2 0 010-4zm0 6a2 2 0 110 4 2 2 0 010-4zm0 6a2 2 0 110 4 2 2 0 010-4z',
+    navigateur: 'M12 2a10 10 0 100 20 10 10 0 000-20zm6.9 9h-3a15 15 0 00-1.3-5.9A8 8 0 0118.9 11zM12 4.1c.9 1.2 1.7 3.6 1.9 6.9h-3.8c.2-3.3 1-5.7 1.9-6.9zM9.4 5.1A15 15 0 008.1 11h-3a8 8 0 014.3-5.9zM5.1 13h3a15 15 0 001.3 5.9A8 8 0 015.1 13zm6.9 6.9c-.9-1.2-1.7-3.6-1.9-6.9h3.8c-.2 3.3-1 5.7-1.9 6.9zm2.6-1A15 15 0 0015.9 13h3a8 8 0 01-4.3 5.9z',
+    fleche: 'M4 10.5h11.6l-4.3-4.3 2.1-2.1 7.9 7.9-7.9 7.9-2.1-2.1 4.3-4.3H4z',
+    lien: 'M12 2a10 10 0 100 20 10 10 0 000-20zm-1.4 5h2.8v7h-2.8zm0 8.5h2.8v2.8h-2.8z',
+    code: 'M3 3h8v8H3zm2 2v4h4V5zm8-2h8v8h-8zm2 2v4h4V5zM3 13h8v8H3zm2 2v4h4v-4zm8-2h3v3h-3zm5 0h3v3h-3zm-5 5h3v3h-3zm5 0h3v3h-3zm-2.5-2.5h3v3h-3z',
+  };
+
+  // format.js ne s'est pas chargé (navigateur d'avant 2015, Opera Mini) : pas de page blanche.
+  if (!F) {
+    app.appendChild(h('div', { class: 'bandeau chrome' }, [
+      h('div', { class: 'dessin-chrome', 'aria-hidden': 'true' }, [h('span', { class: 'rond' }, [icone('navigateur')])]),
+      h('div', { class: 'rang' }, ['Ce navigateur est trop ancien. Ouvre ce lien avec Chrome.']),
+    ]));
+    return;
+  }
+  var INTEGRE = F.estNavigateurIntegre(navigator.userAgent);
+
+  // ------------------------------------------------------------ petits outils
+
+  function h(tag, attrs, enfants) {
+    var e = document.createElement(tag);
+    Object.keys(attrs || {}).forEach(function (k) {
+      var v = attrs[k];
+      if (v === null || v === undefined || v === false) return;
+      if (k.slice(0, 2) === 'on') e.addEventListener(k.slice(2), v);
+      else if (k === 'class') e.className = v;
+      else e.setAttribute(k, v === true ? '' : v);
+    });
+    (enfants || []).forEach(function (c) {
+      if (c === null || c === undefined || c === false) return;
+      e.appendChild(typeof c === 'string' || typeof c === 'number' ? document.createTextNode(String(c)) : c);
+    });
+    return e;
+  }
+  function icone(nom, classe) {
+    var svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('class', 'ico' + (classe ? ' ' + classe : ''));
+    svg.setAttribute('aria-hidden', 'true');
+    var p = document.createElementNS(NS, 'path');
+    p.setAttribute('d', DESSINS[nom]);
+    p.setAttribute('fill-rule', 'evenodd');
+    svg.appendChild(p);
+    return svg;
+  }
+  /** « 10 500 F » : chiffres en gros, le F plus petit. */
+  function montant(n) {
+    return h('span', {}, [F.formaterNombre(n), h('span', { class: 'f' }, ['F'])]);
+  }
+  function articles(n) {
+    return n + (n > 1 ? ' articles' : ' article');
+  }
+  /** Un nom de la boutique ou d'un article, sans coche (✅ ✔ ☑ ✓) : la page n'a jamais l'air « vérifiée ». */
+  function sansCoche(t) {
+    return t.replace(/(\u2705|\u2611|\u2713|\u2714|\uD83D\uDDF8|\uD83D\uDDF9)\uFE0F?/g, '').replace(/\s+/g, ' ').replace(/^ | $/g, '');
+  }
+  function vibrer() {
+    try { if (navigator.vibrate) navigator.vibrate(200); } catch (e) { /* rien */ }
+  }
+  function aujourdhui() {
+    var d = new Date();
+    var deux = function (x) { return x < 10 ? '0' + x : String(x); };
+    return d.getFullYear() + '-' + deux(d.getMonth() + 1) + '-' + deux(d.getDate());
+  }
+  function adressePage() {
+    return location.href.split('#')[0].split('?')[0];
+  }
+  function parler(texte) {
+    if (!VOIX) return;
+    try {
+      window.speechSynthesis.cancel();
+      var u = new window.SpeechSynthesisUtterance(texte);
+      u.lang = 'fr-FR';
+      u.rate = 0.95;
+      window.speechSynthesis.speak(u);
+    } catch (e) { /* pas de voix sur ce téléphone */ }
+  }
+
+  function svg(tag, attrs) {
+    var e = document.createElementNS(NS, tag);
+    Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+    return e;
+  }
+  /** Le logo de l'application (design/systeme/logo.svg) : le commerçant le reconnaît. */
+  function logo() {
+    var l = svg('svg', { viewBox: '0 0 512 512', class: 'ico logo', 'aria-hidden': 'true' });
+    l.appendChild(svg('circle', { cx: 256, cy: 256, r: 246, fill: '#2A2A78' }));
+    l.appendChild(svg('circle', { cx: 256, cy: 256, r: 156, fill: 'none', stroke: '#5A5AC2', 'stroke-width': 6 }));
+    l.appendChild(svg('circle', { cx: 256, cy: 256, r: 196, fill: 'none', stroke: '#FFFCF5', 'stroke-width': 26, 'stroke-dasharray': '0.01 68.407', 'stroke-linecap': 'round' }));
+    l.appendChild(svg('circle', { cx: 256, cy: 256, r: 126, fill: '#FFFCF5' }));
+    l.appendChild(svg('path', { d: 'M191.6 182.4H320.4V219.2H251.4L280.8 256L251.4 292.8H320.4V329.6H191.6V302L228.4 256L191.6 210Z', fill: '#2A2A78', stroke: '#2A2A78', 'stroke-width': 6, 'stroke-linejoin': 'round' }));
+    return l;
+  }
+
+  /** Le motif « disque » de l'en-tête, centré sur le bouton d'écoute. */
+  function motif() {
+    var svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 360 72');
+    svg.setAttribute('class', 'motif');
+    svg.setAttribute('aria-hidden', 'true');
+    var g = document.createElementNS(NS, 'g');
+    g.setAttribute('transform', 'translate(316 36)');
+    g.setAttribute('fill', 'none');
+    g.setAttribute('stroke-linecap', 'round');
+    [[40, '#5A5AC2', 1.5], [49, '#6262CC', 4, 10.253], [59, '#5050B6', 1.5], [70, '#5454BA', 4.5, 11.564],
+      [82, '#4646A8', 1.5], [95, '#4949AC', 5, 12.966], [109, '#3E3E9C', 1.5], [124, '#3F3F9E', 5, 12.975],
+      [140, '#383892', 1.5], [157, '#393993', 5.5, 14.287], [175, '#33338A', 1.5], [194, '#34348B', 5.5, 14.33],
+      [214, '#303084', 1.5], [235, '#303085', 6, 15.533], [257, '#2E2E7F', 1.5], [280, '#2E2E80', 6, 15.559],
+      [304, '#2C2C7C', 1.5]].forEach(function (c) {
+      var cercle = document.createElementNS(NS, 'circle');
+      cercle.setAttribute('r', c[0]);
+      cercle.setAttribute('stroke', c[1]);
+      cercle.setAttribute('stroke-width', c[2]);
+      if (c[3]) cercle.setAttribute('stroke-dasharray', '0.01 ' + c[3]);
+      g.appendChild(cercle);
+    });
+    svg.appendChild(g);
+    return svg;
+  }
+
+  /** En-tête : pastille (ou retour), titre, bouton d'écoute. */
+  function entete(titre, dessin, auRetour, texteAEcouter) {
+    var avant = auRetour
+      ? h('button', { class: 'avant', 'aria-label': 'Retour', onclick: auRetour }, [h('span', { class: 'pastille retour' }, [icone('retour')])])
+      : h('div', { class: 'avant' }, [h('span', { class: 'pastille' }, [icone(dessin)])]);
+    var ecoute = VOIX ? h('button', {
+      class: 'ecoute', 'aria-label': 'Écouter',
+      onclick: function () { parler(typeof texteAEcouter === 'function' ? texteAEcouter() : texteAEcouter); },
+    }, [icone('ecoute')]) : null;
+    return h('header', { class: 'entete' }, [motif(), avant, h('h1', { class: 'titre' }, [titre]), ecoute]);
+  }
+
+  /** Le QR d'un texte, au niveau de correction M, dessiné en traits horizontaux. */
+  function dessinQr(texte) {
+    var m = toQR(texte, 0);
+    var n = Math.round(Math.sqrt(m.length));
+    var d = '';
+    for (var y = 0; y < n; y++) {
+      var x = 0;
+      while (x < n) {
+        if (m[y * n + x]) {
+          var debut = x;
+          while (x < n && m[y * n + x]) x++;
+          d += 'M' + (debut + 4) + ' ' + (y + 4) + 'h' + (x - debut) + 'v1h-' + (x - debut) + 'z';
+        } else x++;
+      }
+    }
+    var svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + (n + 8) + ' ' + (n + 8));
+    svg.setAttribute('shape-rendering', 'crispEdges');
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', 'Code du panier');
+    var fond = document.createElementNS(NS, 'rect');
+    fond.setAttribute('width', n + 8);
+    fond.setAttribute('height', n + 8);
+    fond.setAttribute('fill', '#FFFFFF');
+    var chemin = document.createElementNS(NS, 'path');
+    chemin.setAttribute('d', d);
+    chemin.setAttribute('fill', '#24160D');
+    svg.appendChild(fond);
+    svg.appendChild(chemin);
+    return h('div', { class: 'qr' }, [svg]);
+  }
+
+  function dessinQrSur(texte) {
+    try { return dessinQr(texte); } catch (e) { return h('div'); }
+  }
+
+  /** Copie dans le presse-papiers, même sans HTTPS (Wi-Fi de la boutique). */
+  function copier(texte) {
+    var fait = false;
+    try {
+      var zone = h('textarea', { readonly: true });
+      zone.value = texte;
+      zone.style.position = 'fixed';
+      zone.style.top = '-1000px';
+      document.body.appendChild(zone);
+      zone.select();
+      fait = document.execCommand('copy');
+      document.body.removeChild(zone);
+    } catch (e) { fait = false; }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(texte).catch(function () {});
+    } catch (e) { /* rien */ }
+    return fait;
+  }
+
+  /** L'avertissement, avec son dessin, et dit par le bouton d'écoute de chaque vue du client. */
+  function piedDePage(cat) {
+    return h('div', {}, [
+      h('div', { class: 'bandeau vieux' }, [h('div', { class: 'rang' }, [icone('alerte'), GARDE])]),
+      cat && cat.whatsapp ? h('p', { class: 'pied-page' }, ['Numéro de la boutique : ' + F.formaterWhatsApp(cat.whatsapp) + '.']) : null,
+    ]);
+  }
+
+  /** Dans le navigateur de TikTok ou de Facebook : WhatsApp s'ouvre mal, on propose Chrome. */
+  function bandeauChrome(contenuCatalogue) {
+    if (!INTEGRE) return null;
+    var lien = contenuCatalogue && ANDROID ? F.lienChrome(adressePage(), contenuCatalogue) : null;
+    return h('div', { class: 'bandeau chrome' }, [
+      h('div', { class: 'dessin-chrome', 'aria-hidden': 'true' }, [
+        h('span', { class: 'rond' }, [icone('points')]), icone('fleche', 'fleche'), h('span', { class: 'rond' }, [icone('navigateur')]),
+      ]),
+      h('div', { class: 'rang' }, ['Ouvre avec Chrome : touche les trois points, puis « Ouvrir dans Chrome ».']),
+      lien ? h('a', { class: 'bouton neutre large espace', href: lien }, [icone('navigateur'), 'Ouvrir dans Chrome']) : null,
+    ]);
+  }
+
+  // ------------------------------------------------------------ le panier du client, gardé 24 h
+
+  var etat = { cat: null, contenu: '', hash: null, panier: null, vue: '', tuiles: {}, barre: null, defile: 0, repris: false, texteJour: '' };
+
+  function cleStockage() {
+    return STOCKAGE + ('00000000' + etat.cat.cle.toString(16)).slice(-8);
+  }
+  function tirerDemande() {
+    var o = new Uint8Array(4);
+    try { window.crypto.getRandomValues(o); } catch (e) {
+      for (var i = 0; i < 4; i++) o[i] = Math.floor(Math.random() * 256);
+    }
+    return Array.prototype.map.call(o, function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+  }
+  function nouveauPanier() {
+    return { t: Date.now(), demande: tirerDemande(), q: {}, prenom: '', montre: '' };
+  }
+  /**
+   * Le panier gardé ici s'il a moins de 24 h, sinon un nouveau. Aussi les numéros absents de ce
+   * catalogue (le QR du comptoir n'en porte qu'une partie). `montre` : les lignes déjà montrées.
+   */
+  function chargerPanier() {
+    var p = null;
+    try { p = JSON.parse(window.localStorage.getItem(cleStockage()) || 'null'); } catch (e) { p = null; }
+    var maintenant = Date.now();
+    if (!p || typeof p !== 'object' || typeof p.t !== 'number' || maintenant - p.t > DUREE_PANIER || p.t > maintenant + 60000 ||
+      typeof p.demande !== 'string' || !/^[0-9a-f]{8}$/.test(p.demande) || !p.q || typeof p.q !== 'object') return nouveauPanier();
+    var q = {};
+    Object.keys(p.q).slice(0, F.BORNES.articles).forEach(function (k) {
+      var n = p.q[k];
+      if (/^[1-9][0-9]{0,4}$/.test(k) && Number.isInteger(n) && n > 0) q[k] = Math.min(n, F.BORNES.quantite);
+    });
+    return {
+      t: p.t, demande: p.demande, q: q, montre: typeof p.montre === 'string' ? p.montre : '',
+      prenom: typeof p.prenom === 'string' ? F.nettoyerTexte(p.prenom, F.BORNES.prenom) : '',
+    };
+  }
+  function empreinte(l) {
+    return l.map(function (x) { return x.numero + 'x' + x.quantite; }).join(',');
+  }
+  function garder() {
+    etat.panier.t = Date.now();
+    try { window.localStorage.setItem(cleStockage(), JSON.stringify(etat.panier)); } catch (e) { /* navigation privée */ }
+  }
+  function lignes() {
+    return F.lignesDuPanier(etat.cat, etat.panier.q);
+  }
+  function changer(numero, ecart) {
+    var avant = lignes().length >= F.BORNES.lignes;
+    var q = (etat.panier.q[numero] || 0) + ecart;
+    if (q <= 0) delete etat.panier.q[numero];
+    else if (q <= F.BORNES.quantite) {
+      if (!etat.panier.q[numero] && avant) {
+        parler(F.BORNES.lignes + ' articles différents au plus dans un panier.');
+        vibrer();
+        return;
+      }
+      etat.panier.q[numero] = q;
+    }
+    garder();
+    // Le panier vient de se remplir, ou d'avoir de nouveau de la place : tous les « + » changent.
+    if (avant !== (lignes().length >= F.BORNES.lignes)) Object.keys(etat.tuiles).forEach(function (n) { majTuile(+n); });
+    else majTuile(numero);
+    majBarre();
+  }
+
+  // ------------------------------------------------------------ la vitrine
+
+  function tuile(a) {
+    var q = etat.panier.q[a.numero] || 0;
+    var fini = a.niveau === 'epuise';
+    var plein = !q && lignes().length >= F.BORNES.lignes;
+    var etiquettes = { disponible: ['coche', 'Disponible'], bientot_fini: ['alerte', 'Bientôt fini'], epuise: ['epuise', 'Épuisé'] };
+    var compteur = null;
+    if (!fini && q === 0) {
+      compteur = h('div', { class: 'compteur' }, [
+        h('button', { class: 'pas plus large' + (plein ? ' plein' : ''), 'aria-label': 'Ajouter le ' + a.numero, onclick: function () { changer(a.numero, 1); } }, [icone('plus')]),
+      ]);
+    } else if (!fini) {
+      compteur = h('div', { class: 'compteur' }, [
+        h('button', { class: 'pas moins', 'aria-label': 'Un de moins', onclick: function () { changer(a.numero, -1); } }, [icone('moins')]),
+        h('span', { class: 'qte' + (q >= 100 ? ' tres-long' : q >= 10 ? ' long' : ''), 'aria-live': 'polite' }, [String(q)]),
+        h('button', { class: 'pas plus', 'aria-label': 'Un de plus', disabled: q >= F.BORNES.quantite, onclick: function () { changer(a.numero, 1); } }, [icone('plus')]),
+      ]);
+    }
+    return h('div', { class: 'tuile' + (fini ? ' epuise' : '') + (q ? ' prise' : '') }, [
+      h('div', { class: 'plaque' }, [
+        h('span', { class: 'numero' + (a.numero >= 10000 ? ' tres-long' : a.numero >= 1000 ? ' long' : '') }, [h('span', { class: 'no' }, ['n°']), String(a.numero)]),
+        h('span', { class: 'etiquette ' + a.niveau }, [icone(etiquettes[a.niveau][0]), etiquettes[a.niveau][1]]),
+      ]),
+      h('div', { class: 'corps' }, [
+        a.prix > 0 ? h('div', { class: 'prix' }, [montant(a.prix)]) : h('div', { class: 'prix a-demander' }, ['Prix à demander']),
+        h('div', { class: 'nom' }, [sansCoche(a.nom) || 'Article n° ' + a.numero]),
+      ]),
+      compteur,
+    ]);
+  }
+  function majTuile(numero) {
+    var ancienne = etat.tuiles[numero];
+    var a = etat.cat.articles.filter(function (x) { return x.numero === numero; })[0];
+    if (!ancienne || !a) return;
+    var nouvelle = tuile(a);
+    ancienne.parentNode.replaceChild(nouvelle, ancienne);
+    etat.tuiles[numero] = nouvelle;
+  }
+  function barre() {
+    var l = lignes();
+    var n = F.nombreArticles(l);
+    var resume = n
+      ? h('div', { class: 'resume' }, [
+        h('span', { class: 'rond-panier' }, [icone('panier'), h('span', { class: 'pastille-nombre' }, [String(n)])]),
+        h('span', { class: 'resume-texte' }, [h('span', { class: 'petit' }, [articles(n)]), h('span', { class: 'total' }, [montant(F.totalPanier(l))])]),
+      ])
+      : h('div', { class: 'resume' }, [
+        h('span', { class: 'rond-panier' }, [icone('plus')]),
+        h('span', { class: 'resume-texte' }, [h('span', { class: 'aide' }, ['Touche + pour choisir'])]),
+      ]);
+    return h('div', { class: 'barre' }, [h('div', { class: 'barre-dedans' }, [
+      resume,
+      h('button', { class: 'bouton valider', disabled: !n, onclick: valider }, [icone('coche'), 'Valider']),
+    ])]);
+  }
+  function majBarre() {
+    var nouvelle = barre();
+    etat.barre.parentNode.replaceChild(nouvelle, etat.barre);
+    etat.barre = nouvelle;
+  }
+  function texteVitrine() {
+    var l = lignes();
+    var texte = sansCoche(etat.cat.boutique) + '. ' + etat.texteJour + 'Choisis tes articles avec le bouton plus, puis touche Valider.';
+    if (etat.repris) texte += ' Tu as déjà montré ce panier. Pour en faire un autre, touche Nouveau panier.';
+    if (l.length) texte += ' Ton panier : ' + articles(F.nombreArticles(l)) + ', ' + F.totalPanier(l) + ' francs.';
+    return texte + ' ' + GARDE;
+  }
+  /** Le panier déjà montré, retrouvé en rouvrant la page : il a peut-être été vendu. */
+  function bandeauRepris() {
+    return h('div', { class: 'bandeau' }, [
+      h('div', { class: 'rang' }, [icone('panier'), 'Tu as déjà montré ce panier.']),
+      h('button', { class: 'bouton neutre large espace', onclick: function () {
+        etat.panier = nouveauPanier();
+        etat.repris = false;
+        garder();
+        vueVitrine();
+      } }, [icone('recommencer'), 'Nouveau panier']),
+    ]);
+  }
+
+  function vueVitrine() {
+    var cat = etat.cat;
+    etat.vue = 'vitrine';
+    etat.tuiles = {};
+    var nom = sansCoche(cat.boutique) || 'Vitrine';
+    document.title = nom;
+    app.className = 'avec-barre';
+    app.textContent = '';
+    app.appendChild(entete(nom, 'sac', null, texteVitrine));
+    var chrome = bandeauChrome(etat.contenu);
+    if (chrome) app.appendChild(chrome);
+    var jour = aujourdhui();
+    var quand = F.jourEnClair(cat.jour, jour);
+    // Plus vieux qu'hier (un statut WhatsApp revu, un lien gardé) : on le dit, en orange.
+    var vieux = jour > cat.jour && quand !== 'hier';
+    var texteJour = quand === 'aujourd’hui' ? 'd’aujourd’hui' : quand === 'hier' ? 'd’hier' : 'du ' + quand;
+    etat.texteJour = vieux ? 'Prix et stock du ' + quand + ' : ils ont pu changer. ' : '';
+    app.appendChild(h('div', { class: 'bandeau' + (vieux ? ' vieux' : '') }, [
+      h('div', { class: 'rang' }, [icone('horloge'), 'Prix et stock ' + texteJour + (vieux ? ' : ils ont pu changer' : '')]),
+      h('div', { class: 'rang' }, [icone('etiquette'), 'Le prix final se discute avec le vendeur.']),
+    ]));
+    if (etat.repris && lignes().length) app.appendChild(bandeauRepris());
+    var grille = h('div', { class: 'grille' });
+    cat.articles.forEach(function (a) {
+      var t = tuile(a);
+      etat.tuiles[a.numero] = t;
+      grille.appendChild(t);
+    });
+    if (!cat.articles.length) grille.appendChild(h('p', { class: 'vide' }, ['Pas d’article pour le moment.']));
+    app.appendChild(grille);
+    app.appendChild(piedDePage(cat));
+    etat.barre = barre();
+    app.appendChild(etat.barre);
+  }
+
+  // ------------------------------------------------------------ le panier, à montrer ou à envoyer
+
+  function valider() {
+    var l = lignes();
+    if (!l.length) return;
+    // Montré puis changé : une autre commande (l'ancienne est peut-être vendue). Mêmes lignes, même demande.
+    if (etat.panier.montre && etat.panier.montre !== empreinte(l)) etat.panier.demande = tirerDemande();
+    etat.panier.montre = empreinte(l);
+    etat.repris = false;
+    garder();
+    etat.defile = window.pageYOffset || 0;
+    try { history.pushState({ vitrine: 'panier' }, '', location.href); } catch (e) { /* rien */ }
+    vuePanier();
+  }
+  function retourVitrine() {
+    if (history.state && history.state.vitrine === 'panier') history.back();
+    else { vueVitrine(); window.scrollTo(0, etat.defile); }
+  }
+
+  function vuePanier() {
+    var cat = etat.cat;
+    etat.vue = 'panier';
+    app.className = '';
+    app.textContent = '';
+    window.scrollTo(0, 0);
+    var l = lignes();
+    var n = F.nombreArticles(l);
+    var total = F.totalPanier(l);
+    var noms = {};
+    cat.articles.forEach(function (a) { noms[a.numero] = a.nom; });
+
+    var zoneQr = h('div');
+    var zoneWhatsApp = h('div', { class: 'espace' });
+    function lienPanier() {
+      var octets = F.encoderPanier({ cle: cat.cle, demande: etat.panier.demande, lignes: l, prenom: F.prenomLisible(etat.panier.prenom) });
+      return adressePage() + '#p=' + F.versBase64url(octets);
+    }
+    function dessiner() {
+      var lien = lienPanier();
+      zoneWhatsApp.textContent = '';
+      if (cat.whatsapp) {
+        zoneWhatsApp.appendChild(h('a', {
+          class: 'bouton valider large geant', rel: 'noopener noreferrer',
+          href: F.lienWhatsApp(cat.whatsapp, F.texteWhatsApp(cat, l, F.prenomLisible(etat.panier.prenom), lien)),
+        }, [icone('whatsapp'), 'Envoyer sur WhatsApp']));
+      }
+      zoneQr.textContent = '';
+      zoneQr.appendChild(dessinQrSur(lien));
+    }
+    var attente = 0;
+    var champ = h('input', {
+      type: 'text', maxlength: String(F.BORNES.prenom), autocomplete: 'given-name', enterkeyhint: 'done',
+      placeholder: 'Ton prénom (si tu veux)', 'aria-label': 'Ton prénom',
+      oninput: function () {
+        etat.panier.prenom = F.nettoyerTexte(champ.value, F.BORNES.prenom);
+        garder();
+        clearTimeout(attente);
+        attente = setTimeout(dessiner, 250);
+      },
+    });
+    champ.value = etat.panier.prenom;
+
+    var boutonRecommencer = h('button', { class: 'bouton neutre', onclick: recommencer }, [icone('recommencer'), 'Recommencer']);
+    var armer = 0;
+    function recommencer() {
+      // Deux touchers : un panier ne se vide pas par mégarde.
+      if (!armer) {
+        boutonRecommencer.className = 'bouton annuler';
+        boutonRecommencer.lastChild.textContent = 'Encore : vider';
+        armer = setTimeout(function () {
+          armer = 0;
+          boutonRecommencer.className = 'bouton neutre';
+          boutonRecommencer.lastChild.textContent = 'Recommencer';
+        }, 4000);
+        return;
+      }
+      clearTimeout(armer);
+      etat.panier = nouveauPanier();
+      garder();
+      retourVitrine();
+    }
+
+    var texteEcoute = function () {
+      return 'Montre ce code au vendeur. ' + articles(n) + (total ? ', total affiché ' + total + ' francs' : '') + '. Le prix se discute avec lui. ' + GARDE;
+    };
+    app.appendChild(entete('Ton panier', 'panier', retourVitrine, texteEcoute));
+    var chrome = bandeauChrome(null);
+    if (chrome) app.appendChild(chrome);
+    app.appendChild(h('div', { class: 'carte' }, [
+      h('div', { class: 'titre-carte' }, [icone('telephone'), 'Montre ce code au vendeur']),
+      zoneQr,
+      h('div', { class: 'total-panier' }, [h('span', { class: 'combien' }, [articles(n)]), h('span', { class: 'montant' }, [montant(total)])]),
+      h('p', { class: 'note' }, ['Prix affichés. Le prix final se discute avec le vendeur ; rien n’est payé ici.']),
+    ]));
+    app.appendChild(h('div', { style: 'margin:0 16px' }, [
+      h('label', { class: 'champ' }, [icone('personne'), champ]),
+      zoneWhatsApp,
+    ]));
+    app.appendChild(h('div', { class: 'carte' }, l.map(function (x) {
+      return h('div', { class: 'ligne' }, [
+        h('span', { class: 'badge' }, [String(x.numero)]),
+        h('span', { class: 'ligne-nom' }, [sansCoche(noms[x.numero] || '') || 'Article n° ' + x.numero]),
+        h('span', { class: 'ligne-qte' }, ['×' + x.quantite]),
+        x.prixVu ? h('span', { class: 'ligne-prix' }, [montant(x.prixVu * x.quantite)]) : null,
+      ]);
+    })));
+    app.appendChild(h('div', { class: 'rangee', style: 'margin:12px 16px 0' }, [
+      h('button', { class: 'bouton neutre', onclick: retourVitrine }, [icone('retour'), 'Modifier']),
+      boutonRecommencer,
+    ]));
+    app.appendChild(piedDePage(cat));
+    dessiner();
+  }
+
+  // ------------------------------------------------------------ un panier reçu (#p=) : chez le commerçant
+
+  function vuePanierRecu(panier, contenu) {
+    etat.vue = 'recu';
+    app.className = '';
+    app.textContent = '';
+    var lien = adressePage() + '#p=' + contenu;
+    var n = F.nombreArticles(panier.lignes);
+    var total = F.totalPanier(panier.lignes);
+    var prenom = F.prenomLisible(panier.prenom);
+    var titre = prenom ? 'Panier de ' + prenom : 'Panier d’un client';
+    document.title = titre;
+    var zoneMessage = h('div');
+    var copie = '';
+    function ouvrir() {
+      copier(lien);
+      copie = 'Panier copié. Si SigmaMarket ne s’ouvre pas, ouvre-le toi-même : il trouvera le panier.';
+      parler(copie);
+      zoneMessage.textContent = '';
+      zoneMessage.appendChild(h('div', { class: 'bandeau ok', style: 'margin:12px 0 0' }, [
+        h('div', { class: 'rang' }, [icone('coche'), copie]),
+      ]));
+      setTimeout(function () { location.href = F.lienApplication(contenu, ANDROID, lien); }, 200);
+    }
+    app.appendChild(entete(titre, 'panier', null, function () {
+      return copie || titre + '. ' + articles(n) + '. Touche le bouton vert pour l’ouvrir dans SigmaMarket.';
+    }));
+    app.appendChild(h('div', { class: 'carte' }, panier.lignes.map(function (x) {
+      return h('div', { class: 'ligne' }, [
+        h('span', { class: 'badge' }, [String(x.numero)]),
+        h('span', { class: 'ligne-nom' }, ['Article n° ' + x.numero]),
+        h('span', { class: 'ligne-qte' }, ['×' + x.quantite]),
+        x.prixVu ? h('span', { class: 'ligne-prix' }, [montant(x.prixVu * x.quantite)]) : null,
+      ]);
+    }).concat([
+      h('div', { class: 'total-panier' }, [h('span', { class: 'combien' }, [articles(n)]), h('span', { class: 'montant' }, [montant(total)])]),
+      h('p', { class: 'note' }, ['Prix vus par le client. Le prix de la vente, c’est le vendeur qui le décide.']),
+    ])));
+    app.appendChild(h('div', { style: 'margin:12px 16px 0' }, [
+      h('button', { class: 'bouton valider large geant', onclick: ouvrir }, [logo(), 'Ouvrir dans SigmaMarket']),
+      zoneMessage,
+    ]));
+    app.appendChild(h('div', { class: 'carte' }, [
+      h('div', { class: 'titre-carte' }, [icone('telephone'), 'Ou montre ce code au vendeur']),
+      dessinQrSur(lien),
+    ]));
+    app.appendChild(h('p', { class: 'pied-page' }, ['SigmaMarket ne vérifie ni les boutiques ni les prix.']));
+  }
+
+  // ------------------------------------------------------------ erreurs
+
+  function vueErreur(code) {
+    etat.vue = 'erreur';
+    app.className = '';
+    app.textContent = '';
+    var textes = {
+      pas_un_lien: ['code', 'Vitrine', 'Scanne le code de la boutique pour voir ses articles.'],
+      version_inconnue: ['lien', 'Lien trop récent', 'Ce lien vient d’une version plus récente. Recharge la page.'],
+    };
+    var t = textes[code] || ['lien', 'Ce lien est abîmé', 'Demande au vendeur de te renvoyer le lien de sa boutique.'];
+    app.appendChild(entete('Vitrine', 'sac', null, t[1] + '. ' + t[2]));
+    app.appendChild(h('div', { class: 'erreur' }, [
+      h('div', { class: 'rond-erreur' + (code === 'pas_un_lien' ? ' neutre' : '') }, [icone(t[0])]),
+      h('h1', {}, [t[1]]),
+      h('p', {}, [t[2]]),
+    ]));
+    app.appendChild(piedDePage(null));
+  }
+
+  // ------------------------------------------------------------ départ
+
+  function demarrer() {
+    var texte = location.hash;
+    // Rouvert dans Chrome par lienChrome : le catalogue est dans « ?c= » ; on le remet après le « # ».
+    if (!texte && /^\?c=/.test(location.search)) {
+      texte = '#' + location.search.slice(1);
+      try { history.replaceState(null, '', adressePage() + texte); } catch (e) { /* rien */ }
+    }
+    etat.hash = texte;
+    var lu;
+    try { lu = F.lireAdresse(texte); } catch (e) { vueErreur(e.code || 'abime'); return; }
+    if (lu.type === 'panier') { vuePanierRecu(lu.panier, lu.texte); return; }
+    etat.cat = lu.catalogue;
+    etat.contenu = lu.texte;
+    etat.panier = chargerPanier();
+    etat.repris = etat.panier.montre !== '';
+    vueVitrine();
+  }
+
+  window.addEventListener('popstate', function () {
+    if (etat.vue === 'panier') { vueVitrine(); window.scrollTo(0, etat.defile); }
+  });
+  // Un autre lien dans le même onglet : tout autre hash que celui affiché redémarre la page.
+  window.addEventListener('hashchange', function () {
+    if (location.hash !== etat.hash) demarrer();
+  });
+  demarrer();
+})();
+</script>
+</body>
+</html>
