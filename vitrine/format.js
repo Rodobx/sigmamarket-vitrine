@@ -6,12 +6,13 @@
  * tests/domain/vitrine.test.ts charge ce fichier tel quel et le compare à l'application, sur des
  * allers-retours et sur des milliers de contenus abîmés ou fabriqués.
  *
- * Aucun appel réseau. Expose `VitrineFormat` sur l'objet global.
+ * Aucun appel réseau. Les petites photos (catalogue en version 2, D54) se chargent depuis le
+ * serveur de la boutique, et de lui seul : adresseMiniature. Expose `VitrineFormat` sur l'objet global.
  */
 (function (racine) {
   'use strict';
 
-  const VERSION_CATALOGUE = 1;
+  const VERSION_CATALOGUE = 2;
   const VERSION_PANIER = 1;
   const TYPE_CATALOGUE = 1;
   const TYPE_PANIER = 2;
@@ -36,6 +37,12 @@
   const NIVEAUX = ['epuise', 'bientot_fini', 'disponible'];
   const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
   const PAQUET_ANDROID = 'com.sigmamarket.app';
+  const VERSION_PHOTO_MAX = 16383;
+  const SERVEUR_COURT_MAX = 64;
+  const PORT_SERVEUR_ESSAI = 54321;
+  const SUPABASE = /^https:\/\/([a-z0-9]{20})\.supabase\.co\/?$/;
+  const ESSAI = new RegExp('^http:\\/\\/[A-Za-z0-9.-]+:' + PORT_SERVEUR_ESSAI + '\\/?$');
+  const BAC_VITRINE = 'vitrine';
 
   function erreur(code, detail) {
     let e = new Error(detail ? code + ' : ' + detail : code);
@@ -279,7 +286,7 @@
     if (o.length > octetsMax) throw erreur('trop_long');
     if (o.length < 3) throw erreur('abime', 'trop court');
     if (o[0] >> 4 !== type) throw erreur('mauvais_type');
-    if ((o[0] & 15) !== version) throw erreur('version_inconnue', 'version ' + (o[0] & 15));
+    if ((o[0] & 15) < 1 || (o[0] & 15) > version) throw erreur('version_inconnue', 'version ' + (o[0] & 15));
     let fin = o.length - 2;
     let somme = fnv1a(o, fin) & 0xffff;
     if (((o[fin] << 8) | o[fin + 1]) !== somme) throw erreur('abime', 'somme de contrôle');
@@ -310,19 +317,58 @@
     return d.getUTCFullYear() + '-' + deux(d.getUTCMonth() + 1) + '-' + deux(d.getUTCDate());
   }
 
+  // ---------------------------------------------------------------- petites photos (D54)
+
+  /** Le serveur auquel la page accepte de parler : un projet Supabase (https) ou le serveur d'essai. */
+  function serveurPermis(url) {
+    return SUPABASE.test(url) || ESSAI.test(url);
+  }
+  function estServeurCourt(court) {
+    return court.length <= SERVEUR_COURT_MAX && court.slice(-1) !== '/' && (/^[a-z0-9]{20}$/.test(court) || ESSAI.test(court));
+  }
+  /** « abcdefghijklmnopqrst » → https://abcdefghijklmnopqrst.supabase.co ; null si le serveur n'est pas permis. */
+  function urlDuServeur(court) {
+    let url = /^[a-z0-9]{20}$/.test(court) ? 'https://' + court + '.supabase.co' : String(court).replace(/\/+$/, '');
+    return serveurPermis(url) ? url : null;
+  }
+  function hexa8(n) {
+    return ('00000000' + (n >>> 0).toString(16)).slice(-8);
+  }
+  /** L'adresse publique de la petite photo d'un article, ou null s'il n'en a pas. */
+  function adresseMiniature(catalogue, article) {
+    let photos = catalogue.photos || null;
+    if (photos === null || !article.photo) return null;
+    let url = urlDuServeur(photos.serveur);
+    if (url === null) return null;
+    return url + '/storage/v1/object/public/' + BAC_VITRINE + '/' + photos.dossier + '/' + article.numero + '-' + article.photo + '.jpg';
+  }
+  /** L'origine d'où viennent les photos d'un catalogue (« https://xxxx.supabase.co »), ou null. */
+  function originePhotos(catalogue) {
+    let photos = catalogue.photos || null;
+    return photos === null ? null : urlDuServeur(photos.serveur);
+  }
+
   // ---------------------------------------------------------------- catalogue et panier
 
   function decoderCatalogue(o) {
     let r = ouvrir(o, TYPE_CATALOGUE, VERSION_CATALOGUE, BORNES.octetsCatalogue);
+    let avecPhotos = (o[0] & 15) === 2;
     let cle = r.u32();
     let jour = nombreVersJour(r.varint(JOURS_MAX));
     let boutique = r.texte(BORNES.nomBoutique);
     let w = r.varint(WHATSAPP_MAX);
     let whatsapp = w === 0 ? null : String(w);
     exiger(whatsapp === null || /^[1-9]\d{7,14}$/.test(whatsapp), 'numéro WhatsApp');
+    let photos = null;
+    if (avecPhotos) {
+      let serveur = r.texte(SERVEUR_COURT_MAX);
+      exiger(estServeurCourt(serveur), 'serveur');
+      photos = { serveur: serveur, dossier: hexa8(cle) + hexa8(r.u32()) };
+    }
     let n = r.varint(BORNES.articles);
     let articles = [];
     let numero = 0;
+    let unePhoto = false;
     for (let k = 0; k < n; k++) {
       let v = r.varint(BORNES.numero * 4 + 3);
       let ecart = Math.floor(v / 4);
@@ -332,10 +378,21 @@
       exiger(v % 4 <= 2, 'niveau');
       let nom = r.texte(BORNES.nomArticle);
       let prix = prixDuCode(r.varint(PRIX_CODE_MAX));
-      articles.push({ numero: numero, nom: nom, prix: prix, niveau: NIVEAUX[v % 4] });
+      let article = { numero: numero, nom: nom, prix: prix, niveau: NIVEAUX[v % 4] };
+      if (avecPhotos) {
+        let photo = r.varint(VERSION_PHOTO_MAX);
+        if (photo > 0) {
+          article.photo = photo;
+          unePhoto = true;
+        }
+      }
+      articles.push(article);
     }
     r.terminer();
-    return { cle: cle, jour: jour, boutique: boutique, whatsapp: whatsapp, articles: articles };
+    exiger(!avecPhotos || unePhoto, 'version 2 sans photo');
+    let catalogue = { cle: cle, jour: jour, boutique: boutique, whatsapp: whatsapp, articles: articles };
+    if (photos !== null) catalogue.photos = photos;
+    return catalogue;
   }
 
   function encoderPanier(panier) {
@@ -527,6 +584,10 @@
     versBase64url: versBase64url,
     depuisBase64url: depuisBase64url,
     decoderCatalogue: decoderCatalogue,
+    serveurPermis: serveurPermis,
+    urlDuServeur: urlDuServeur,
+    adresseMiniature: adresseMiniature,
+    originePhotos: originePhotos,
     encoderPanier: encoderPanier,
     decoderPanier: decoderPanier,
     lireAdresse: lireAdresse,

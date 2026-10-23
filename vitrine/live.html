@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: https://*.supabase.co http://*:54321; connect-src https://*.supabase.co http://*:54321; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#1C1C56">
+<title>Live</title>
+<!--
+  SigmaMarket · page du client pendant un live (D53).
+  Le lien (#l=CODE&s=serveur&k=clé publique) vient du téléphone du vendeur. La page parle au serveur
+  de la boutique, et à lui seul (la règle de sécurité ci-dessus n'autorise que Supabase et le serveur
+  d'essai) : voir les articles, commander, suivre sa commande, y renoncer. Chaque commande garde ses
+  articles le temps donné pour payer ; payée, le vendeur la valide ; sinon elle s'annule seule.
+  Les petites photos des articles (D54) viennent du stockage du même serveur : la règle de sécurité
+  est resserrée à son origine dès que le lien est lu (restreindreImages).
+  Règles : live.js, copie de src/domain/live.ts, vérifiée par tests/domain/live.test.ts.
+  ES2015, sans dépendance. Même dessin que la vitrine (index.html).
+-->
+<style>
+:root{--creme:#FAF3E3;--ivoire:#FFFCF5;--blanc:#FFFFFF;--lin:#F1E6CF;--sable:#E7DAC0;--argile:#8F7757;--encre:#24160D;--encre-douce:#5A4634;--indigo:#2A2A78;--indigo-vif:#4141A0;--vert:#0B5F2F;--vert-clair:#DDF1DF;--rouge:#9E141A;--rouge-clair:#FBE3DE;--orange:#F28C16;--orange-fonce:#8A3C00;--orange-clair:#FDEBD0;--ombre-1:0 1px 3px rgba(36,22,13,.16);--ombre-2:0 3px 8px rgba(36,22,13,.22)}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:#FAF3E3;background:var(--creme);color:var(--encre);font:500 17px/22px system-ui,-apple-system,Roboto,'Segoe UI',sans-serif;font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;border:0;background:none;padding:0;margin:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+a{-webkit-tap-highlight-color:transparent}
+svg{display:block}
+.ico{width:24px;height:24px;fill:currentColor;flex:none}
+#app{max-width:480px;margin:0 auto;min-height:100vh;padding-bottom:24px}
+#app.avec-barre{padding-bottom:112px}
+.f{font-size:.62em;font-weight:700;margin-left:.16em}
+.cache{display:none!important}
+
+/* En-tête : indigo, coins bas arrondis, motif « disque » derrière le bouton d'écoute */
+.entete{position:relative;height:72px;display:flex;align-items:center;padding:0 8px;background:var(--indigo);border-radius:0 0 24px 24px;overflow:hidden;color:var(--ivoire)}
+.entete>*{position:relative}
+.entete>.motif{position:absolute;top:0;right:0;width:360px;height:72px}
+.avant{flex:none;width:64px;height:64px;display:flex;align-items:center;justify-content:center}
+.pastille{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:var(--indigo-vif);color:var(--ivoire)}
+.pastille .ico{width:28px;height:28px}
+.pastille.retour{background:var(--ivoire);color:var(--encre);box-shadow:0 2px 5px rgba(13,13,46,.4)}
+.titre{flex:1;min-width:0;margin:0 8px;font-size:20px;line-height:24px;font-weight:700;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
+.ecoute{flex:none;width:56px;height:56px;border-radius:28px;display:flex;align-items:center;justify-content:center;background:var(--ivoire);color:var(--indigo);box-shadow:0 2px 5px rgba(13,13,46,.4)}
+.ecoute .ico{width:30px;height:30px}
+.ecoute.parle{background:var(--indigo-vif);color:var(--ivoire)}
+
+/* Bandeaux et cartes */
+.bandeau{margin:12px 16px 0;padding:10px 12px;border-radius:16px;background:var(--ivoire);border:1px solid var(--sable);font-size:15px;line-height:20px;font-weight:600;color:var(--encre-douce)}
+.bandeau .rang{display:flex;align-items:center}
+.bandeau .rang+.rang{margin-top:6px}
+.bandeau .ico{margin-right:10px}
+.bandeau.vieux{background:var(--orange-clair);border:2px solid var(--orange);color:var(--encre)}
+.pas.plein{opacity:.38}
+.bandeau.ok{background:var(--vert-clair);border:2px solid var(--vert);color:var(--encre)}
+.bandeau.chrome{background:var(--orange-clair);border:2px solid var(--orange);color:var(--encre);padding:12px}
+.dessin-chrome{display:flex;align-items:center;justify-content:center;margin-bottom:10px}
+.dessin-chrome .rond{width:44px;height:44px;border-radius:22px;background:var(--ivoire);border:2px solid var(--encre);display:flex;align-items:center;justify-content:center}
+.dessin-chrome .fleche{margin:0 8px;color:var(--encre)}
+.carte{margin:12px 16px 0;padding:16px;background:var(--ivoire);border:1px solid var(--sable);border-radius:24px;box-shadow:var(--ombre-1)}
+.titre-carte{display:flex;align-items:center;font-size:20px;line-height:24px;font-weight:800}
+.titre-carte .ico{width:32px;height:32px;margin-right:10px}
+.note{margin:8px 0 0;font-size:15px;line-height:20px;color:var(--encre-douce)}
+
+/* La grille des articles : deux colonnes ; la photo en grand (carrée), le numéro en badge dessus ;
+   sans photo, le numéro en très grand (comme la vitrine, index.html) */
+.grille{display:flex;flex-wrap:wrap;justify-content:space-between;padding:12px 16px 0}
+.tuile{position:relative;width:calc(50% - 6px);margin-bottom:12px;display:flex;flex-direction:column;background:var(--ivoire);border:1px solid var(--sable);border-radius:20px;overflow:hidden;box-shadow:var(--ombre-1)}
+.tuile.prise{box-shadow:0 0 0 3px var(--encre),var(--ombre-2)}
+.plaque{position:relative;height:96px;padding:0 12px 4px;background:var(--lin);display:flex;align-items:flex-end}
+.numero{font-size:52px;line-height:56px;font-weight:800;letter-spacing:-1px;white-space:nowrap}
+.numero .no{font-size:18px;font-weight:700;letter-spacing:0;margin-right:2px}
+.numero.long{font-size:40px}
+.numero.tres-long{font-size:32px}
+.tuile.epuise .numero{opacity:.4}
+.plaque.carre{display:block;height:auto;padding:0}
+.plaque.carre:before{content:'';display:block;padding-top:100%}
+.photo{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .2s}
+.photo.prete{opacity:1}
+.tuile.epuise .photo.prete{opacity:.45;filter:grayscale(1)}
+.plaque.carre .numero{position:absolute;left:8px;bottom:8px;height:32px;padding:0 9px;border-radius:12px;background:var(--ivoire);color:var(--encre);font-size:22px;line-height:32px;letter-spacing:0;box-shadow:var(--ombre-2)}
+.plaque.carre .numero .no{font-size:13px}
+.tuile.epuise .plaque.carre .numero{opacity:1}
+.plaque.carre.photo-absente .numero{left:12px;bottom:4px;height:auto;padding:0;border-radius:0;background:none;box-shadow:none;font-size:52px;line-height:56px;letter-spacing:-1px}
+.plaque.carre.photo-absente .numero .no{font-size:18px}
+.plaque.carre.photo-absente .numero.long{font-size:40px}
+.plaque.carre.photo-absente .numero.tres-long{font-size:32px}
+.tuile.epuise .plaque.carre.photo-absente .numero{opacity:.4}
+.etiquette{position:absolute;top:0;right:0;height:32px;padding:0 10px 0 7px;display:flex;align-items:center;border-radius:0 0 0 14px;border:solid var(--ivoire);border-width:0 0 2px 2px;font-size:13px;line-height:16px;font-weight:800;white-space:nowrap}
+.etiquette .ico{width:18px;height:18px;margin-right:4px}
+.etiquette.disponible{background:var(--vert);color:var(--blanc)}
+.etiquette.bientot_fini{background:var(--orange);color:var(--encre)}
+.etiquette.epuise{background:var(--rouge);color:var(--blanc)}
+.corps{flex:1;padding:8px 12px 0}
+.prix{font-size:22px;line-height:26px;font-weight:800;white-space:nowrap}
+.prix.a-demander{font-size:15px;line-height:26px;color:var(--encre-douce)}
+.nom{margin-top:2px;font-size:14px;line-height:18px;color:var(--encre-douce);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word;min-height:36px}
+.compteur{display:flex;align-items:center;justify-content:space-between;padding:8px 6px 6px}
+.pas{width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center}
+.pas .ico{width:32px;height:32px}
+.pas.plus{background:var(--encre);color:var(--ivoire);box-shadow:var(--ombre-2)}
+.pas.moins{background:var(--ivoire);border:3px solid var(--encre);color:var(--encre)}
+.pas.large{width:100%}
+.pas[disabled]{opacity:.38;box-shadow:none}
+.qte{flex:1;min-width:0;text-align:center;font-size:30px;line-height:34px;font-weight:800}
+.qte.long{font-size:24px}
+.qte.tres-long{font-size:18px}
+.vide{padding:24px 16px;text-align:center;color:var(--encre-douce)}
+
+/* Barre du bas : le panier en cours et Valider */
+.barre{position:fixed;left:0;right:0;bottom:0;z-index:2;background:var(--ivoire);border-top:1px solid var(--sable);box-shadow:0 -2px 8px rgba(36,22,13,.12);padding:12px 16px;padding-bottom:calc(12px + env(safe-area-inset-bottom))}
+.barre-dedans{max-width:448px;margin:0 auto;display:flex;align-items:center}
+.resume{flex:1;min-width:0;display:flex;align-items:center}
+.rond-panier{position:relative;flex:none;width:52px;height:52px;border-radius:26px;background:var(--lin);display:flex;align-items:center;justify-content:center;margin-right:10px}
+.rond-panier .ico{width:30px;height:30px}
+.pastille-nombre{position:absolute;top:-4px;right:-6px;min-width:26px;height:26px;padding:0 6px;border-radius:13px;background:var(--encre);color:var(--ivoire);border:2px solid var(--ivoire);font-size:14px;line-height:22px;font-weight:800;text-align:center}
+.resume-texte{min-width:0}
+.resume-texte .petit{display:block;font-size:14px;line-height:18px;font-weight:600;color:var(--encre-douce);white-space:nowrap}
+.resume-texte .total{display:block;font-size:26px;line-height:30px;font-weight:800;white-space:nowrap}
+.resume-texte .aide{display:block;font-size:16px;line-height:20px;font-weight:700}
+
+/* Boutons */
+.bouton{height:64px;padding:0 20px;border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:18px;line-height:22px;font-weight:700;white-space:nowrap;text-decoration:none}
+.bouton .ico{width:30px;height:30px;margin-right:8px}
+.bouton .ico.logo{width:42px;height:42px;margin-right:10px}
+.bouton.valider{background:var(--vert);color:var(--blanc);box-shadow:var(--ombre-2)}
+.bouton.neutre{background:var(--ivoire);border:3px solid var(--encre);color:var(--encre)}
+.bouton.annuler{background:var(--rouge-clair);border:3px solid var(--rouge);color:var(--rouge)}
+.bouton.large{width:100%}
+.bouton.geant{height:72px;font-size:20px}
+.bouton[disabled]{opacity:.38;box-shadow:none}
+.rangee{display:flex;margin-top:12px}
+.rangee>.bouton{flex:1;min-width:0;padding:0 8px;font-size:16px}
+.rangee>.bouton .ico{width:26px;height:26px;margin-right:6px}
+.rangee>.bouton+.bouton{margin-left:12px}
+.espace{margin-top:12px}
+
+/* Écran du panier */
+.qr{margin:12px auto 0;width:100%;max-width:300px;padding:0;background:var(--blanc);border-radius:12px;border:1px solid var(--sable)}
+.qr svg{width:100%;height:auto}
+.total-panier{display:flex;align-items:baseline;justify-content:space-between;margin-top:12px}
+.total-panier .combien{font-size:17px;font-weight:700;color:var(--encre-douce)}
+.total-panier .montant{font-size:36px;line-height:42px;font-weight:800;white-space:nowrap}
+.ligne{display:flex;align-items:center;padding:8px 0;border-top:1px solid var(--sable)}
+.ligne:first-child{border-top:0}
+.badge{flex:none;min-width:48px;height:40px;padding:0 6px;margin-right:10px;border-radius:12px;background:var(--lin);font-size:20px;line-height:40px;font-weight:800;text-align:center}
+.ligne-nom{flex:1;min-width:0;font-size:16px;line-height:20px;font-weight:600;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
+.ligne-qte{flex:none;margin:0 10px;font-size:20px;font-weight:800}
+.ligne-prix{flex:none;font-size:17px;font-weight:800;white-space:nowrap}
+.champ{display:flex;align-items:center;height:64px;margin-top:12px;padding:0 14px;border:2px solid var(--argile);border-radius:20px;background:var(--ivoire)}
+.champ .ico{color:var(--encre-douce);margin-right:10px}
+.champ input{flex:1;min-width:0;height:56px;border:0;background:none;font:inherit;font-size:18px;color:var(--encre);outline:none}
+.erreur{margin:48px 16px 0;text-align:center}
+.rond-erreur{width:96px;height:96px;margin:0 auto 16px;border-radius:48px;background:var(--rouge-clair);color:var(--rouge);display:flex;align-items:center;justify-content:center}
+.rond-erreur.neutre{background:var(--lin);color:var(--encre)}
+.rond-erreur .ico{width:52px;height:52px}
+.erreur h1{margin:0 0 8px;font-size:22px;line-height:28px;font-weight:800}
+.erreur p{margin:0;font-size:17px;line-height:22px;color:var(--encre-douce)}
+.pied-page{margin:20px 16px 0;font-size:13px;line-height:18px;color:var(--encre-douce);text-align:center}
+noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text-align:center}
+
+/* Le live : en direct, le compte à rebours, les messages */
+.direct{display:inline-flex;align-items:center;height:32px;padding:0 12px;border-radius:16px;background:var(--rouge);color:var(--blanc);font-size:15px;font-weight:800;margin-right:10px}
+.direct .point{width:10px;height:10px;border-radius:5px;background:var(--blanc);margin-right:6px}
+.bandeau.alerte{background:var(--rouge-clair);border:2px solid var(--rouge);color:var(--encre)}
+.compte{display:flex;align-items:center;justify-content:center;margin-top:12px;height:96px;border-radius:24px;background:var(--lin);color:var(--encre);font-size:56px;line-height:60px;font-weight:800}
+.compte .ico{width:44px;height:44px;margin-right:12px}
+.compte.orange{background:var(--orange);color:var(--encre)}
+.compte.rouge{background:var(--rouge);color:var(--blanc)}
+.arrivee{display:flex;align-items:center;justify-content:center;margin-top:12px;font-size:17px;font-weight:700;color:var(--encre-douce)}
+.arrivee .rang-gros{display:inline-flex;align-items:center;justify-content:center;min-width:56px;height:56px;padding:0 8px;margin-left:10px;border-radius:28px;background:var(--encre);color:var(--ivoire);font-size:28px;font-weight:800}
+.fin{margin:24px 16px 0;text-align:center}
+.fin h1{margin:0 0 8px;font-size:24px;line-height:30px;font-weight:800}
+.fin p{margin:0;font-size:17px;line-height:22px;color:var(--encre-douce)}
+.rond-fin{width:112px;height:112px;margin:0 auto 16px;border-radius:56px;display:flex;align-items:center;justify-content:center}
+.rond-fin .ico{width:64px;height:64px}
+.rond-fin.vert{background:var(--vert);color:var(--blanc)}
+.rond-fin.rouge{background:var(--rouge-clair);color:var(--rouge)}
+.etiquette.reste{background:var(--orange);color:var(--encre)}
+</style>
+</head>
+<body>
+<noscript><p>Pour commander, ouvre ce lien avec Chrome.</p></noscript>
+<div id="app"></div>
+<script src="live.js"></script>
+<script>
+(function () {
+  'use strict';
+  var L = window.VitrineLive;
+  var NS = 'http://www.w3.org/2000/svg';
+  var app = document.getElementById('app');
+  var STOCKAGE = 'sigmamarket.live.';
+  var VOIX = typeof window.speechSynthesis !== 'undefined' && typeof window.SpeechSynthesisUtterance !== 'undefined';
+  var GARDE = 'SigmaMarket ne vérifie ni les boutiques ni les prix. Ne paie qu’au numéro du vendeur que tu connais.';
+  // Ce qui reste se redemande toutes les 20 secondes : cent clients qui regardent tiennent dans le
+  // transfert du plan gratuit (docs/SYNCHRONISATION.md). La commande, elle, toutes les 4 secondes.
+  var SUIVI_ARTICLES_MS = 20000;
+  var SUIVI_COMMANDE_MS = 4000;
+  var HORLOGE_MS = 1000;
+
+  // Dessins (24 x 24), ceux de la vitrine, et le direct.
+  var DESSINS = {
+    plus: 'M10.5 3.5h3v7h7v3h-7v7h-3v-7h-7v-3h7z',
+    moins: 'M3.5 10.5h17v3h-17z',
+    coche: 'M3.3 12.6l2.2-2.2 4 4 9-9 2.2 2.2L9.5 18.8z',
+    alerte: 'M12 2.5L1.5 21h21zm-1.4 6.5h2.8v6h-2.8zm0 7.6h2.8v2.6h-2.8z',
+    epuise: 'M12 2a10 10 0 100 20 10 10 0 000-20zm0 3a7 7 0 015.6 11.2L7.8 6.4A7 7 0 0112 5zm-7 7c0-1.6.5-3 1.4-4.2l9.8 9.8A7 7 0 015 12z',
+    ecoute: 'M3 9v6h4l5 5V4L7 9zm13.5 3A4.5 4.5 0 0014 8v8a4.5 4.5 0 002.5-4zM14 3.2v2.1a7 7 0 010 13.4v2.1a9 9 0 000-17.6z',
+    retour: 'M20 10.5H8.6l5.2-5.2L11.7 3.2 2.9 12l8.8 8.8 2.1-2.1-5.2-5.2H20z',
+    panier: 'M5.6 8.5L9.2 3l1.7 1.1-2.9 4.4h8l-2.9-4.4L14.8 3l3.6 5.5H22l-2.2 11c-.2 1-1 1.5-2 1.5H6.2c-1 0-1.8-.5-2-1.5L2 8.5zM7 11.5v6h2v-6zm4 0v6h2v-6zm4 0v6h2v-6z',
+    horloge: 'M12 2a10 10 0 100 20 10 10 0 000-20zm0 2.5a7.5 7.5 0 110 15 7.5 7.5 0 010-15zM10.8 7h2.4v4.4l3.4 2-1.2 2.1-4.6-2.7z',
+    personne: 'M12 12a4.5 4.5 0 100-9 4.5 4.5 0 000 9zm0 2c-4.4 0-8 2.2-8 5v2h16v-2c0-2.8-3.6-5-8-5z',
+    telephone: 'M7.5 1.5h9c1.1 0 2 .9 2 2v17c0 1.1-.9 2-2 2h-9c-1.1 0-2-.9-2-2v-17c0-1.1.9-2 2-2zM8 4.5v14h8v-14z',
+    whatsapp: 'M12 2.2a9.8 9.8 0 00-8.5 14.7L2.2 21.8l5-1.3A9.8 9.8 0 1012 2.2zm0 1.9a7.9 7.9 0 11-4 14.7l-.3-.2-3 .8.8-2.9-.2-.3A7.9 7.9 0 0112 4.1zM8.9 7.4c-.2 0-.6 0-.9.4-.3.3-1.1 1.1-1.1 2.7s1.2 3.1 1.3 3.3c.2.2 2.3 3.6 5.6 4.9 2.8 1.1 3.3.9 4 .8.6-.1 1.9-.8 2.2-1.6.3-.8.3-1.4.2-1.6l-.6-.4-2-1c-.3-.1-.5-.1-.7.1l-.9 1.2c-.2.2-.3.2-.6.1-.3-.1-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.5-.5.3-.5v-.5l-.9-2.3c-.2-.6-.5-.5-.7-.5z',
+    recommencer: 'M12.5 7.5c-2.6 0-5 1-6.8 2.6L2.5 7v9h9l-3.4-3.4a7.5 7.5 0 0112 3.4l2.6-.9A10.4 10.4 0 0012.5 7.5z',
+    croix: 'M6.2 4.1L12 9.9l5.8-5.8 2.1 2.1-5.8 5.8 5.8 5.8-2.1 2.1-5.8-5.8-5.8 5.8-2.1-2.1 5.8-5.8-5.8-5.8z',
+    lien: 'M12 2a10 10 0 100 20 10 10 0 000-20zm-1.4 5h2.8v7h-2.8zm0 8.5h2.8v2.8h-2.8z',
+    direct: 'M12 9.5a2.5 2.5 0 110 5 2.5 2.5 0 010-5zM7.1 7.1l1.4 1.4a5 5 0 000 7l-1.4 1.4a7 7 0 010-9.8zm9.8 0a7 7 0 010 9.8l-1.4-1.4a5 5 0 000-7zM4.2 4.2l1.4 1.4a9 9 0 000 12.8l-1.4 1.4a11 11 0 010-15.6zm15.6 0a11 11 0 010 15.6l-1.4-1.4a9 9 0 000-12.8z',
+  };
+
+  // live.js ne s'est pas chargé (navigateur d'avant 2015) : pas de page blanche.
+  if (!L) {
+    app.appendChild(h('div', { class: 'bandeau alerte' }, ['Ce navigateur est trop ancien. Ouvre ce lien avec Chrome.']));
+    return;
+  }
+
+  var etat = {
+    adresse: null,
+    live: null,
+    articles: [],
+    panier: {},
+    ecart: 0,
+    commande: null,
+    jeton: null,
+    vue: '',
+    message: null,
+    minuteur: null,
+    horloge: null,
+    noeuds: {},
+    envoi: false,
+    photos: {},
+  };
+
+  // ------------------------------------------------------------ petits outils
+
+  function h(tag, attrs, enfants) {
+    var e = document.createElement(tag);
+    Object.keys(attrs || {}).forEach(function (k) {
+      var v = attrs[k];
+      if (v === null || v === undefined || v === false) return;
+      if (k.slice(0, 2) === 'on') e.addEventListener(k.slice(2), v);
+      else if (k === 'class') e.className = v;
+      else e.setAttribute(k, v === true ? '' : v);
+    });
+    (enfants || []).forEach(function (c) {
+      if (c === null || c === undefined || c === false) return;
+      e.appendChild(typeof c === 'string' || typeof c === 'number' ? document.createTextNode(String(c)) : c);
+    });
+    return e;
+  }
+  function icone(nom, classe) {
+    var s = document.createElementNS(NS, 'svg');
+    s.setAttribute('viewBox', '0 0 24 24');
+    s.setAttribute('class', 'ico' + (classe ? ' ' + classe : ''));
+    s.setAttribute('aria-hidden', 'true');
+    var p = document.createElementNS(NS, 'path');
+    p.setAttribute('d', DESSINS[nom]);
+    p.setAttribute('fill-rule', 'evenodd');
+    s.appendChild(p);
+    return s;
+  }
+  function nombre(n) {
+    return String(Math.trunc(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  }
+  function montant(n) {
+    return h('span', {}, [nombre(n), h('span', { class: 'f' }, ['F'])]);
+  }
+  function articles(n) {
+    return n + (n > 1 ? ' articles' : ' article');
+  }
+  function sansCoche(t) {
+    return String(t || '').replace(/(✅|☑|✓|✔|🗸|🗹)️?/g, '').replace(/\s+/g, ' ').replace(/^ | $/g, '');
+  }
+  function vibrer() {
+    try { if (navigator.vibrate) navigator.vibrate(200); } catch (e) { /* rien */ }
+  }
+  function parler(texte) {
+    if (!VOIX) return;
+    try {
+      window.speechSynthesis.cancel();
+      var u = new window.SpeechSynthesisUtterance(texte);
+      u.lang = 'fr-FR';
+      u.rate = 0.95;
+      window.speechSynthesis.speak(u);
+    } catch (e) { /* pas de voix sur ce téléphone */ }
+  }
+  function lire(cle) {
+    try { return window.localStorage.getItem(STOCKAGE + cle); } catch (e) { return null; }
+  }
+  function ecrire(cle, valeur) {
+    try {
+      if (valeur === null) window.localStorage.removeItem(STOCKAGE + cle);
+      else window.localStorage.setItem(STOCKAGE + cle, valeur);
+    } catch (e) { /* stockage refusé : la page marche quand même */ }
+  }
+  function appeler(fonction, corps) {
+    return L.appeler(function (u, i) { return window.fetch(u, i); }, etat.adresse.serveur, fonction, corps);
+  }
+  function arreter() {
+    if (etat.minuteur !== null) clearTimeout(etat.minuteur);
+    if (etat.horloge !== null) clearTimeout(etat.horloge);
+    etat.minuteur = null;
+    etat.horloge = null;
+  }
+  function plusTard(f, ms) {
+    if (etat.minuteur !== null) clearTimeout(etat.minuteur);
+    etat.minuteur = setTimeout(function () { etat.minuteur = null; f(); }, ms);
+  }
+  function nomBoutique() {
+    return (etat.live && sansCoche(etat.live.nom)) || 'Live';
+  }
+  function minutesPourPayer() {
+    return etat.live ? Math.round(etat.live.delai_ms / 60000) : 0;
+  }
+
+  function entete(titre, auRetour, texteAEcouter) {
+    var avant = auRetour
+      ? h('button', { class: 'avant', 'aria-label': 'Retour', onclick: auRetour }, [h('span', { class: 'pastille retour' }, [icone('retour')])])
+      : h('div', { class: 'avant' }, [h('span', { class: 'pastille' }, [icone('direct')])]);
+    var ecoute = VOIX ? h('button', {
+      class: 'ecoute', 'aria-label': 'Écouter',
+      onclick: function () { parler(typeof texteAEcouter === 'function' ? texteAEcouter() : texteAEcouter); },
+    }, [icone('ecoute')]) : null;
+    return h('header', { class: 'entete' }, [avant, h('h1', { class: 'titre' }, [titre]), ecoute]);
+  }
+  function bandeauMessage() {
+    if (!etat.message) return null;
+    var m = etat.message;
+    etat.message = null;
+    return h('div', { class: 'bandeau ' + (m.alerte ? 'alerte' : 'vieux'), role: 'alert' }, [h('div', { class: 'rang' }, [icone('alerte'), m.texte])]);
+  }
+  function dire(texte, alerte) {
+    etat.message = { texte: texte, alerte: alerte !== false };
+    vibrer();
+    parler(texte);
+  }
+
+  // ------------------------------------------------------------ le panier
+
+  function lignes() {
+    return Object.keys(etat.panier).map(Number).filter(function (n) { return etat.panier[n] > 0; }).sort(function (a, b) { return a - b; })
+      .map(function (n) {
+        var a = etat.articles.filter(function (x) { return x.numero === n; })[0];
+        return { numero: n, quantite: etat.panier[n], prix: a ? a.prix : 0, nom: a ? a.nom : '' };
+      });
+  }
+  function total(l) {
+    return l.reduce(function (s, x) { return s + x.quantite * x.prix; }, 0);
+  }
+  function combien(l) {
+    return l.reduce(function (s, x) { return s + x.quantite; }, 0);
+  }
+  function maximum(a) {
+    if (a.niveau === 'epuise') return 0;
+    return typeof a.reste === 'number' ? Math.min(a.reste, L.BORNES.quantite) : L.BORNES.quantite;
+  }
+  /** Le panier suit ce qui reste : un article épuisé ou retiré en sort, une quantité trop grande baisse. */
+  function ajusterPanier() {
+    Object.keys(etat.panier).map(Number).forEach(function (n) {
+      var a = etat.articles.filter(function (x) { return x.numero === n; })[0];
+      var max = a ? maximum(a) : 0;
+      if (etat.panier[n] > max) etat.panier[n] = max;
+      if (!etat.panier[n]) delete etat.panier[n];
+    });
+  }
+  function changer(numero, ecart) {
+    var a = etat.articles.filter(function (x) { return x.numero === numero; })[0];
+    if (!a) return;
+    var q = (etat.panier[numero] || 0) + ecart;
+    if (ecart > 0 && !etat.panier[numero] && lignes().length >= L.BORNES.lignes) return;
+    q = Math.max(0, Math.min(q, maximum(a)));
+    if (q) etat.panier[numero] = q; else delete etat.panier[numero];
+    dessinerGrille();
+    dessinerBarre();
+  }
+
+  // ------------------------------------------------------------ les petites photos (D54)
+
+  var origineRestreinte = null;
+  /** Resserre la règle de sécurité des images à l'origine du serveur du live (voir index.html). */
+  function restreindreImages(origine) {
+    if (origine === origineRestreinte) return;
+    if (origineRestreinte !== null) {
+      if (typeof location.reload === 'function') location.reload();
+      return;
+    }
+    var tete = document.head;
+    if (!tete) return;
+    tete.appendChild(h('meta', { 'http-equiv': 'Content-Security-Policy', content: 'img-src data: ' + origine }));
+    origineRestreinte = origine;
+  }
+  /**
+   * La petite photo d'un article : une image par adresse, gardée d'un dessin à l'autre (la grille
+   * se redessine à chaque + et à chaque nouvelle lecture du stock : rien ne se recharge). Si elle ne
+   * vient pas, le numéro reprend sa place en grand.
+   */
+  function photoDe(a) {
+    var adresse = L.adressePhoto(etat.adresse.serveur, a.photo);
+    if (!adresse) return null;
+    var p = etat.photos[adresse];
+    if (p) return p;
+    p = { img: null, etat: 'attente' };
+    // `loading` avant `src` : posé après, Firefox et Safari ont déjà lancé le chargement.
+    p.img = h('img', {
+      class: 'photo', loading: 'lazy', decoding: 'async', alt: '', width: '320', height: '320', src: adresse,
+      onload: function () {
+        p.etat = 'prete';
+        p.img.className = 'photo prete';
+      },
+      onerror: function () {
+        p.etat = 'echec';
+        var plaque = p.img.parentNode;
+        if (plaque) {
+          plaque.removeChild(p.img);
+          plaque.className = 'plaque carre photo-absente';
+        }
+      },
+    });
+    etat.photos[adresse] = p;
+    return p;
+  }
+
+  // ------------------------------------------------------------ les articles
+
+  function tuile(a) {
+    var q = etat.panier[a.numero] || 0;
+    var fini = a.niveau === 'epuise';
+    var max = maximum(a);
+    var plein = !q && lignes().length >= L.BORNES.lignes;
+    var etiquettes = { disponible: ['coche', 'Disponible'], bientot_fini: ['alerte', 'Bientôt fini'], epuise: ['epuise', 'Épuisé'] };
+    var etiquette = typeof a.reste === 'number' ? ['alerte', 'Plus que ' + a.reste] : etiquettes[a.niveau];
+    var compteur = null;
+    if (!fini && q === 0) {
+      compteur = h('div', { class: 'compteur' }, [
+        h('button', { class: 'pas plus large' + (plein ? ' plein' : ''), 'aria-label': 'Ajouter le ' + a.numero, onclick: function () { changer(a.numero, 1); } }, [icone('plus')]),
+      ]);
+    } else if (!fini) {
+      compteur = h('div', { class: 'compteur' }, [
+        h('button', { class: 'pas moins', 'aria-label': 'Un de moins', onclick: function () { changer(a.numero, -1); } }, [icone('moins')]),
+        h('span', { class: 'qte' + (q >= 10 ? ' long' : ''), 'aria-live': 'polite' }, [String(q)]),
+        h('button', { class: 'pas plus', 'aria-label': 'Un de plus', disabled: q >= max, onclick: function () { changer(a.numero, 1); } }, [icone('plus')]),
+      ]);
+    }
+    var p = photoDe(a);
+    var classePlaque = p === null ? 'plaque' : p.etat === 'echec' ? 'plaque carre photo-absente' : 'plaque carre';
+    return h('div', { class: 'tuile' + (fini ? ' epuise' : '') + (q ? ' prise' : '') }, [
+      h('div', { class: classePlaque }, [
+        p !== null && p.etat !== 'echec' ? p.img : null,
+        h('span', { class: 'numero' + (a.numero >= 10000 ? ' tres-long' : a.numero >= 1000 ? ' long' : '') }, [h('span', { class: 'no' }, ['n°']), String(a.numero)]),
+        h('span', { class: 'etiquette ' + (typeof a.reste === 'number' ? 'reste' : a.niveau) }, [icone(etiquette[0]), etiquette[1]]),
+      ]),
+      h('div', { class: 'corps' }, [
+        a.prix > 0 ? h('div', { class: 'prix' }, [montant(a.prix)]) : h('div', { class: 'prix a-demander' }, ['Prix à demander']),
+        h('div', { class: 'nom' }, [sansCoche(a.nom) || 'Article n° ' + a.numero]),
+      ]),
+      compteur,
+    ]);
+  }
+  function grille() {
+    var g = h('div', { class: 'grille' });
+    etat.articles.forEach(function (a) { g.appendChild(tuile(a)); });
+    if (!etat.articles.length) g.appendChild(h('p', { class: 'vide' }, ['Pas d’article pour le moment.']));
+    return g;
+  }
+  function dessinerGrille() {
+    if (etat.vue !== 'articles' || !etat.noeuds.grille) return;
+    var nouvelle = grille();
+    etat.noeuds.grille.parentNode.replaceChild(nouvelle, etat.noeuds.grille);
+    etat.noeuds.grille = nouvelle;
+  }
+  function barre() {
+    var l = lignes();
+    var n = combien(l);
+    var resume = n
+      ? h('div', { class: 'resume' }, [
+        h('span', { class: 'rond-panier' }, [icone('panier'), h('span', { class: 'pastille-nombre' }, [String(n)])]),
+        h('span', { class: 'resume-texte' }, [h('span', { class: 'petit' }, [articles(n)]), h('span', { class: 'total' }, [montant(total(l))])]),
+      ])
+      : h('div', { class: 'resume' }, [
+        h('span', { class: 'rond-panier' }, [icone('plus')]),
+        h('span', { class: 'resume-texte' }, [h('span', { class: 'aide' }, ['Touche + pour choisir'])]),
+      ]);
+    return h('div', { class: 'barre' }, [h('div', { class: 'barre-dedans' }, [
+      resume,
+      h('button', { class: 'bouton valider', disabled: !n, onclick: vueFormulaire }, [icone('coche'), 'Commander']),
+    ])]);
+  }
+  function dessinerBarre() {
+    if (etat.vue !== 'articles' || !etat.noeuds.barre) return;
+    var nouvelle = barre();
+    etat.noeuds.barre.parentNode.replaceChild(nouvelle, etat.noeuds.barre);
+    etat.noeuds.barre = nouvelle;
+  }
+  function texteArticles() {
+    if (etat.live && !etat.live.ouvert) return nomBoutique() + '. Le live est fermé : on ne peut plus commander.';
+    var l = lignes();
+    var t = nomBoutique() + '. Live en direct. Choisis tes articles avec le bouton plus, puis touche Commander. Après, tu auras ' +
+      minutesPourPayer() + ' minutes pour payer le vendeur, sinon la commande s’annule.';
+    if (l.length) t += ' Ton panier : ' + articles(combien(l)) + ', ' + total(l) + ' francs.';
+    return t + ' ' + GARDE;
+  }
+
+  function vueArticles() {
+    arreter();
+    etat.vue = 'articles';
+    document.title = nomBoutique();
+    app.className = etat.live && etat.live.ouvert ? 'avec-barre' : '';
+    app.textContent = '';
+    app.appendChild(entete(nomBoutique(), null, texteArticles));
+    var message = bandeauMessage();
+    if (message) app.appendChild(message);
+    if (!etat.live.ouvert) {
+      app.appendChild(h('div', { class: 'fin' }, [
+        h('div', { class: 'rond-fin rouge' }, [icone('direct')]),
+        h('h1', {}, ['Le live est fermé']),
+        h('p', {}, ['On ne peut plus commander.']),
+      ]));
+      plusTard(rafraichirArticles, SUIVI_ARTICLES_MS);
+      return;
+    }
+    app.appendChild(h('div', { class: 'bandeau' }, [
+      h('div', { class: 'rang' }, [h('span', { class: 'direct' }, [h('span', { class: 'point' }), 'EN DIRECT'])]),
+      h('div', { class: 'rang' }, [icone('horloge'), minutesPourPayer() + ' min pour payer, après ta commande. Sinon elle s’annule.']),
+    ]));
+    etat.noeuds.grille = grille();
+    app.appendChild(etat.noeuds.grille);
+    app.appendChild(h('p', { class: 'pied-page' }, [GARDE]));
+    etat.noeuds.barre = barre();
+    app.appendChild(etat.noeuds.barre);
+    plusTard(rafraichirArticles, SUIVI_ARTICLES_MS);
+  }
+
+  /** Ce qui reste change pendant le live : la page le redemande, sans rien perdre du panier. */
+  function rafraichirArticles() {
+    if (etat.vue !== 'articles') return;
+    appeler('live_voir', { p_code: etat.adresse.code }).then(function (r) {
+      if (etat.vue !== 'articles') return;
+      if (r && r.ok) {
+        var etaitOuvert = etat.live.ouvert;
+        recevoirVue(r);
+        if (etaitOuvert !== etat.live.ouvert) { vueArticles(); return; }
+        dessinerGrille();
+        dessinerBarre();
+      }
+      plusTard(rafraichirArticles, SUIVI_ARTICLES_MS);
+    }, function () {
+      plusTard(rafraichirArticles, SUIVI_ARTICLES_MS);
+    });
+  }
+  function recevoirVue(r) {
+    etat.live = r.live;
+    etat.articles = r.articles || [];
+    etat.ecart = r.maintenant - Date.now();
+    ajusterPanier();
+  }
+
+  // ------------------------------------------------------------ prénom, numéro, commander
+
+  function vueFormulaire() {
+    var l = lignes();
+    if (!l.length) return;
+    arreter();
+    etat.vue = 'formulaire';
+    app.className = '';
+    app.textContent = '';
+    app.appendChild(entete('Ta commande', vueArticles, function () {
+      return 'Écris ton prénom et ton numéro de téléphone, puis touche Commander. Tu auras ' + minutesPourPayer() + ' minutes pour payer le vendeur.';
+    }));
+    var message = bandeauMessage();
+    if (message) app.appendChild(message);
+    app.appendChild(h('div', { class: 'carte' }, l.map(function (x) {
+      return h('div', { class: 'ligne' }, [
+        h('span', { class: 'badge' }, [String(x.numero)]),
+        h('span', { class: 'ligne-nom' }, [sansCoche(x.nom) || 'Article n° ' + x.numero]),
+        h('span', { class: 'ligne-qte' }, ['×' + x.quantite]),
+        h('span', { class: 'ligne-prix' }, [montant(x.quantite * x.prix)]),
+      ]);
+    }).concat([h('div', { class: 'total-panier' }, [h('span', { class: 'combien' }, [articles(combien(l))]), h('span', { class: 'montant' }, [montant(total(l))])])])));
+    var prenom = h('input', { type: 'text', maxlength: String(L.BORNES.prenom), autocomplete: 'given-name', 'aria-label': 'Ton prénom', placeholder: 'Ton prénom' });
+    prenom.value = lire('prenom') || '';
+    var telephone = h('input', { type: 'tel', inputmode: 'tel', maxlength: '20', autocomplete: 'tel', 'aria-label': 'Ton numéro de téléphone', placeholder: '07 00 00 00 00' });
+    telephone.value = lire('telephone') || '';
+    app.appendChild(h('div', { class: 'carte' }, [
+      h('label', { class: 'champ' }, [icone('personne'), prenom]),
+      h('label', { class: 'champ' }, [icone('telephone'), telephone]),
+      h('button', {
+        class: 'bouton valider large geant espace', 'aria-label': 'Commander',
+        onclick: function () { commander(prenom.value, telephone.value); },
+      }, [icone('coche'), 'Commander']),
+      h('p', { class: 'note' }, ['Le vendeur voit ton prénom et ton numéro, pour le paiement.']),
+    ]));
+    app.appendChild(h('p', { class: 'pied-page' }, [GARDE]));
+  }
+
+  function commander(prenom, telephone) {
+    if (etat.envoi) return;
+    var p = sansCoche(prenom).slice(0, L.BORNES.prenom);
+    var t = L.chiffres(telephone);
+    if (!p) { dire(L.texteRefus('prenom_manquant')); vueFormulaire(); return; }
+    if (t.length < 8 || t.length > 15) { dire(L.texteRefus('telephone_invalide')); vueFormulaire(); return; }
+    ecrire('prenom', p);
+    ecrire('telephone', t);
+    etat.envoi = true;
+    appeler('live_commander', {
+      p_code: etat.adresse.code,
+      p_commande: { prenom: p, telephone: t, lignes: lignes().map(function (x) { return { numero: x.numero, quantite: x.quantite }; }) },
+    }).then(function (r) {
+      etat.envoi = false;
+      if (r && r.ok) {
+        etat.jeton = r.jeton;
+        ecrire('jeton.' + etat.adresse.code, r.jeton);
+        etat.commande = r.commande;
+        etat.ecart = r.maintenant - Date.now();
+        etat.panier = {};
+        vibrer();
+        parler('Commande enregistrée. Tu as ' + L.minutesRestantes(L.resteAPayerMs(r.commande.expire_le, Date.now(), etat.ecart)) +
+          ' minutes pour payer le vendeur.');
+        vueCommande();
+        return;
+      }
+      var refus = r && r.refus;
+      if (refus === 'stock_insuffisant' && r.detail) {
+        r.detail.forEach(function (d) {
+          if (d.reste > 0) etat.panier[d.numero] = Math.min(etat.panier[d.numero] || 0, d.reste); else delete etat.panier[d.numero];
+        });
+      }
+      if (refus === 'article_absent' && r.detail) r.detail.forEach(function (n) { delete etat.panier[n]; });
+      dire(L.texteRefus(refus, r && r.detail));
+      if (refus === 'live_ferme' || refus === 'stock_insuffisant' || refus === 'article_absent' || refus === 'trop_de_commandes') {
+        recharger();
+        return;
+      }
+      vueFormulaire();
+    }, function () {
+      etat.envoi = false;
+      dire('Pas de réseau. Ta commande n’est pas partie. Réessaie.');
+      vueFormulaire();
+    });
+  }
+
+  // ------------------------------------------------------------ la commande : le temps pour payer
+
+  function texteCommande() {
+    var c = etat.commande;
+    if (!c) return '';
+    if (c.etat === 'validee') return 'Ta commande est validée. Merci !';
+    if (c.etat === 'annulee') return texteFin(c).join(' ');
+    var reste = L.resteAPayerMs(c.expire_le, Date.now(), etat.ecart);
+    return 'Commande numéro ' + c.rang + ', ' + total(c.lignes.map(function (x) { return { quantite: x.quantite, prix: x.prix_unitaire }; })) +
+      ' francs. Il te reste ' + L.minutesRestantes(reste) + ' minutes pour payer le vendeur. Quand il a reçu l’argent, il valide ta commande. ' +
+      'Sinon elle s’annule seule. ' + GARDE;
+  }
+  function texteFin(c) {
+    if (c.annulee_par === 'temps') return ['Temps fini', 'Ta commande est annulée : le temps pour payer est passé.'];
+    if (c.annulee_par === 'client') return ['Commande annulée', 'Tu as annulé ta commande.'];
+    return ['Commande annulée', 'Le vendeur a annulé ta commande.'];
+  }
+
+  function vueCommande() {
+    arreter();
+    var c = etat.commande;
+    etat.vue = 'commande';
+    app.className = '';
+    app.textContent = '';
+    app.appendChild(entete(nomBoutique(), null, texteCommande));
+    var message = bandeauMessage();
+    if (message) app.appendChild(message);
+    if (c.etat !== 'attente') {
+      var fin = c.etat === 'validee' ? ['Commande validée', 'Le vendeur a reçu ton paiement. Merci !'] : texteFin(c);
+      app.appendChild(h('div', { class: 'fin' }, [
+        h('div', { class: 'rond-fin ' + (c.etat === 'validee' ? 'vert' : 'rouge') }, [icone(c.etat === 'validee' ? 'coche' : 'croix')]),
+        h('h1', {}, [fin[0]]),
+        h('p', {}, [fin[1]]),
+      ]));
+    } else {
+      etat.noeuds.compte = h('div', { class: 'compte', role: 'timer', 'aria-live': 'off' }, [icone('horloge'), h('span', {}, [''])]);
+      app.appendChild(etat.noeuds.compte);
+      app.appendChild(h('div', { class: 'arrivee' }, ['Ta place', h('span', { class: 'rang-gros' }, [String(c.rang)])]));
+      app.appendChild(h('div', { class: 'bandeau vieux' }, [
+        h('div', { class: 'rang' }, [icone('horloge'), 'Paie maintenant le vendeur. Quand il a reçu l’argent, il valide ta commande. Sinon elle s’annule à la fin du temps.']),
+      ]));
+      if (etat.live && etat.live.whatsapp) {
+        var texte = 'Bonjour, j’ai commandé pendant le live : numéro ' + c.rang + ', ' + c.prenom + ', ' +
+          total(c.lignes.map(function (x) { return { quantite: x.quantite, prix: x.prix_unitaire }; })) + ' F. Comment je paie ?';
+        app.appendChild(h('div', { class: 'carte' }, [
+          h('a', { class: 'bouton valider large', href: 'https://wa.me/' + etat.live.whatsapp + '?text=' + encodeURIComponent(texte), target: '_blank', rel: 'noopener noreferrer' },
+            [icone('whatsapp'), 'Écrire au vendeur']),
+        ]));
+      }
+    }
+    app.appendChild(h('div', { class: 'carte' }, c.lignes.map(function (x) {
+      return h('div', { class: 'ligne' }, [
+        h('span', { class: 'badge' }, [String(x.numero)]),
+        h('span', { class: 'ligne-nom' }, [sansCoche(x.nom) || 'Article n° ' + x.numero]),
+        h('span', { class: 'ligne-qte' }, ['×' + x.quantite]),
+        h('span', { class: 'ligne-prix' }, [montant(x.quantite * x.prix_unitaire)]),
+      ]);
+    }).concat([h('div', { class: 'total-panier' }, [h('span', { class: 'combien' }, ['Total']), h('span', { class: 'montant' }, [montant(c.total)])])])));
+    if (c.etat === 'attente') {
+      app.appendChild(h('div', { class: 'carte' }, [
+        h('button', { class: 'bouton annuler large', 'aria-label': 'Annuler ma commande', onclick: renoncer }, [icone('croix'), 'Annuler ma commande']),
+      ]));
+      tic();
+      plusTard(suivreCommande, SUIVI_COMMANDE_MS);
+    } else {
+      app.appendChild(h('div', { class: 'carte' }, [
+        h('button', { class: 'bouton neutre large', 'aria-label': 'Commander encore', onclick: recommencer }, [icone('recommencer'), 'Commander encore']),
+      ]));
+    }
+    app.appendChild(h('p', { class: 'pied-page' }, [GARDE]));
+  }
+
+  /** Chaque seconde : le temps qui reste, et sa couleur. À zéro, la commande se relit (annulée par le temps). */
+  function tic() {
+    var c = etat.commande;
+    if (etat.vue !== 'commande' || !c || c.etat !== 'attente') return;
+    var reste = L.resteAPayerMs(c.expire_le, Date.now(), etat.ecart);
+    var teinte = L.teinteCompteARebours(reste, etat.live ? etat.live.delai_ms : reste);
+    etat.noeuds.compte.className = 'compte' + (teinte === 'normal' ? '' : ' ' + teinte);
+    etat.noeuds.compte.lastChild.textContent = L.formaterCompteARebours(reste);
+    if (reste <= 0) { suivreCommande(); return; }
+    etat.horloge = setTimeout(tic, HORLOGE_MS);
+  }
+
+  function suivreCommande() {
+    if (etat.vue !== 'commande') return;
+    appeler('live_ma_commande', { p_code: etat.adresse.code, p_jeton: etat.jeton }).then(function (r) {
+      if (etat.vue !== 'commande') return;
+      if (r && r.ok) {
+        var avant = etat.commande.etat;
+        etat.commande = r.commande;
+        etat.ecart = r.maintenant - Date.now();
+        if (r.commande.etat !== avant) {
+          vibrer();
+          parler(r.commande.etat === 'validee' ? 'Ta commande est validée. Merci !' : texteFin(r.commande).join('. '));
+          vueCommande();
+          return;
+        }
+      }
+      plusTard(suivreCommande, SUIVI_COMMANDE_MS);
+    }, function () {
+      plusTard(suivreCommande, SUIVI_COMMANDE_MS);
+    });
+  }
+
+  function renoncer() {
+    if (etat.envoi) return;
+    etat.envoi = true;
+    appeler('live_annuler_ma_commande', { p_code: etat.adresse.code, p_jeton: etat.jeton }).then(function (r) {
+      etat.envoi = false;
+      if (r && r.ok) {
+        etat.commande = r.commande;
+        parler('Commande annulée.');
+        vueCommande();
+      }
+    }, function () {
+      etat.envoi = false;
+      dire('Pas de réseau. Réessaie.');
+      vueCommande();
+    });
+  }
+
+  function recommencer() {
+    ecrire('jeton.' + etat.adresse.code, null);
+    etat.jeton = null;
+    etat.commande = null;
+    recharger();
+  }
+
+  // ------------------------------------------------------------ départ
+
+  function vueErreur(titre, texte) {
+    arreter();
+    etat.vue = 'erreur';
+    app.className = '';
+    app.textContent = '';
+    app.appendChild(entete('Live', null, titre + '. ' + texte));
+    app.appendChild(h('div', { class: 'erreur' }, [
+      h('div', { class: 'rond-erreur' }, [icone('lien')]),
+      h('h1', {}, [titre]),
+      h('p', {}, [texte]),
+    ]));
+    if (etat.adresse) {
+      app.appendChild(h('div', { class: 'carte' }, [
+        h('button', { class: 'bouton neutre large', 'aria-label': 'Réessayer', onclick: recharger }, [icone('recommencer'), 'Réessayer']),
+      ]));
+    }
+  }
+
+  function recharger() {
+    arreter();
+    etat.vue = 'chargement';
+    app.className = '';
+    app.textContent = '';
+    app.appendChild(entete('Live', null, 'Un instant.'));
+    app.appendChild(h('p', { class: 'vide' }, ['Un instant…']));
+    appeler('live_voir', { p_code: etat.adresse.code }).then(function (r) {
+      if (!r || !r.ok) {
+        vueErreur('Live introuvable', L.texteRefus(r && r.refus));
+        return;
+      }
+      recevoirVue(r);
+      etat.jeton = lire('jeton.' + etat.adresse.code);
+      if (!etat.jeton) { vueArticles(); return; }
+      return appeler('live_ma_commande', { p_code: etat.adresse.code, p_jeton: etat.jeton }).then(function (m) {
+        if (m && m.ok && m.commande.etat === 'attente') {
+          etat.commande = m.commande;
+          etat.ecart = m.maintenant - Date.now();
+          vueCommande();
+          return;
+        }
+        // Une commande finie (validée, annulée) : on la dit une fois, puis on repart des articles.
+        if (m && m.ok) {
+          etat.message = { texte: m.commande.etat === 'validee' ? 'Ta commande précédente est validée. Merci !' : texteFin(m.commande).join(' : '), alerte: m.commande.etat !== 'validee' };
+        }
+        ecrire('jeton.' + etat.adresse.code, null);
+        etat.jeton = null;
+        vueArticles();
+      });
+    }).then(null, function () {
+      vueErreur('Pas de réseau', 'Le live a besoin d’internet. Vérifie ta connexion, puis réessaie.');
+    });
+  }
+
+  function demarrer() {
+    etat.hash = location.hash;
+    etat.adresse = L.lireAdresseLive(location.href);
+    if (!etat.adresse) {
+      vueErreur('Ce lien est abîmé', 'Demande au vendeur de te renvoyer le lien de son live.');
+      return;
+    }
+    etat.photos = {};
+    restreindreImages(etat.adresse.serveur.url.replace(/\/+$/, ''));
+    recharger();
+  }
+
+  window.addEventListener('hashchange', function () {
+    if (location.hash !== etat.hash) demarrer();
+  });
+  demarrer();
+})();
+</script>
+</body>
+</html>

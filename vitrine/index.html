@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: https://*.supabase.co http://*:54321; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#1C1C56">
@@ -12,6 +12,7 @@
   SigmaMarket · page du client de la vitrine (mode sans serveur).
   Le catalogue arrive dans l'adresse (#c=…), le panier repart dans l'adresse (#p=…) : rien ne passe
   par un serveur, aucun appel réseau (la règle de sécurité ci-dessus l'interdit au navigateur).
+  Seule exception (D54) : les petites photos, chargées du stockage de la boutique, et de lui seul.
   Formats : format.js, copie de src/domain/vitrine.ts, vérifiée par tests/domain/vitrine.test.ts.
   ES2015, sans dépendance ; QR dessiné par toqr (MIT, licence plus bas).
 -->
@@ -59,7 +60,7 @@ svg{display:block}
 .titre-carte .ico{width:32px;height:32px;margin-right:10px}
 .note{margin:8px 0 0;font-size:15px;line-height:20px;color:var(--encre-douce)}
 
-/* La grille des articles : deux colonnes, des tuiles sans photo, le numéro en très grand */
+/* La grille : la photo en grand, le numéro en badge dessus ; sans photo, le numéro en très grand */
 .grille{display:flex;flex-wrap:wrap;justify-content:space-between;padding:12px 16px 0}
 .tuile{position:relative;width:calc(50% - 6px);margin-bottom:12px;display:flex;flex-direction:column;background:var(--ivoire);border:1px solid var(--sable);border-radius:20px;overflow:hidden;box-shadow:var(--ombre-1)}
 .tuile.prise{box-shadow:0 0 0 3px var(--encre),var(--ombre-2)}
@@ -69,6 +70,19 @@ svg{display:block}
 .numero.long{font-size:40px}
 .numero.tres-long{font-size:32px}
 .tuile.epuise .numero{opacity:.4}
+.plaque.carre{display:block;height:auto;padding:0}
+.plaque.carre:before{content:'';display:block;padding-top:100%}
+.photo{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .2s}
+.photo.prete{opacity:1}
+.tuile.epuise .photo.prete{opacity:.45;filter:grayscale(1)}
+.plaque.carre .numero{position:absolute;left:8px;bottom:8px;height:32px;padding:0 9px;border-radius:12px;background:var(--ivoire);color:var(--encre);font-size:22px;line-height:32px;letter-spacing:0;box-shadow:var(--ombre-2)}
+.plaque.carre .numero .no{font-size:13px}
+.tuile.epuise .plaque.carre .numero{opacity:1}
+.plaque.carre.photo-absente .numero{left:12px;bottom:4px;height:auto;padding:0;border-radius:0;background:none;box-shadow:none;font-size:52px;line-height:56px;letter-spacing:-1px}
+.plaque.carre.photo-absente .numero .no{font-size:18px}
+.plaque.carre.photo-absente .numero.long{font-size:40px}
+.plaque.carre.photo-absente .numero.tres-long{font-size:32px}
+.tuile.epuise .plaque.carre.photo-absente .numero{opacity:.4}
 .etiquette{position:absolute;top:0;right:0;height:32px;padding:0 10px 0 7px;display:flex;align-items:center;border-radius:0 0 0 14px;border:solid var(--ivoire);border-width:0 0 2px 2px;font-size:13px;line-height:16px;font-weight:800;white-space:nowrap}
 .etiquette .ico{width:18px;height:18px;margin-right:4px}
 .etiquette.disponible{background:var(--vert);color:var(--blanc)}
@@ -943,7 +957,49 @@ return toQR;
 
   // ------------------------------------------------------------ le panier du client, gardé 24 h
 
-  var etat = { cat: null, contenu: '', hash: null, panier: null, vue: '', tuiles: {}, barre: null, defile: 0, repris: false, texteJour: '' };
+  var etat = { cat: null, contenu: '', hash: null, panier: null, vue: '', tuiles: {}, barre: null, defile: 0, repris: false, texteJour: '', photos: {} };
+
+  // ------------------------------------------------------------ les petites photos (D54)
+
+  var origineRestreinte = null;
+  // Une seconde règle de sécurité resserre les images à l'origine du serveur de CE catalogue.
+  function restreindreImages(origine) {
+    if (origine === origineRestreinte) return;
+    if (origineRestreinte !== null) {
+      if (typeof location.reload === 'function') location.reload();
+      return;
+    }
+    var tete = document.head;
+    if (!tete) return;
+    tete.appendChild(h('meta', { 'http-equiv': 'Content-Security-Policy', content: 'img-src data: ' + origine }));
+    origineRestreinte = origine;
+  }
+  // Une image par adresse, gardée d'un dessin à l'autre ; si elle ne vient pas, le numéro en grand.
+  function photoDe(a) {
+    var adresse = F.adresseMiniature(etat.cat, a);
+    if (!adresse) return null;
+    var p = etat.photos[adresse];
+    if (p) return p;
+    p = { img: null, etat: 'attente' };
+    // `loading` avant `src` : posé après, Firefox et Safari ont déjà lancé le chargement.
+    p.img = h('img', {
+      class: 'photo', loading: 'lazy', decoding: 'async', alt: '', width: '320', height: '320', src: adresse,
+      onload: function () {
+        p.etat = 'prete';
+        p.img.className = 'photo prete';
+      },
+      onerror: function () {
+        p.etat = 'echec';
+        var plaque = p.img.parentNode;
+        if (plaque) {
+          plaque.removeChild(p.img);
+          plaque.className = 'plaque carre photo-absente';
+        }
+      },
+    });
+    etat.photos[adresse] = p;
+    return p;
+  }
 
   function cleStockage() {
     return STOCKAGE + ('00000000' + etat.cat.cle.toString(16)).slice(-8);
@@ -1031,8 +1087,11 @@ return toQR;
         h('button', { class: 'pas plus', 'aria-label': 'Un de plus', disabled: q >= F.BORNES.quantite, onclick: function () { changer(a.numero, 1); } }, [icone('plus')]),
       ]);
     }
+    var p = photoDe(a);
+    var classePlaque = p === null ? 'plaque' : p.etat === 'echec' ? 'plaque carre photo-absente' : 'plaque carre';
     return h('div', { class: 'tuile' + (fini ? ' epuise' : '') + (q ? ' prise' : '') }, [
-      h('div', { class: 'plaque' }, [
+      h('div', { class: classePlaque }, [
+        p !== null && p.etat !== 'echec' ? p.img : null,
         h('span', { class: 'numero' + (a.numero >= 10000 ? ' tres-long' : a.numero >= 1000 ? ' long' : '') }, [h('span', { class: 'no' }, ['n°']), String(a.numero)]),
         h('span', { class: 'etiquette ' + a.niveau }, [icone(etiquettes[a.niveau][0]), etiquettes[a.niveau][1]]),
       ]),
@@ -1330,6 +1389,9 @@ return toQR;
     if (lu.type === 'panier') { vuePanierRecu(lu.panier, lu.texte); return; }
     etat.cat = lu.catalogue;
     etat.contenu = lu.texte;
+    etat.photos = {};
+    var origine = F.originePhotos(lu.catalogue);
+    if (origine) restreindreImages(origine);
     etat.panier = chargerPanier();
     etat.repris = etat.panier.montre !== '';
     vueVitrine();
