@@ -39,9 +39,6 @@
   const PAQUET_ANDROID = 'com.sigmamarket.app';
   const VERSION_PHOTO_MAX = 16383;
   const SERVEUR_COURT_MAX = 64;
-  const PORT_SERVEUR_ESSAI = 54321;
-  const SUPABASE = /^https:\/\/([a-z0-9]{20})\.supabase\.co\/?$/;
-  const ESSAI = new RegExp('^http:\\/\\/[A-Za-z0-9.-]+:' + PORT_SERVEUR_ESSAI + '\\/?$');
   const BAC_VITRINE = 'vitrine';
 
   function erreur(code, detail) {
@@ -103,8 +100,37 @@
   }
 
   /**
+   * Les mots que l'application dit elle-même (« payé », « valide »…) : un prénom qui en contient un
+   * ferait croire que sa voix annonce un paiement. Sans accents, en minuscules. Mêmes mots que
+   * MOTS_DE_L_APPLICATION (src/domain/vitrine.ts) et prive.mots_de_l_application (0012_public.sql).
+   */
+  const MOTS_DE_L_APPLICATION = [
+    'paye', 'payee', 'payes', 'payer', 'paiement', 'paiements', 'valide', 'valides', 'validee',
+    'validees', 'valider', 'validation', 'commande', 'commandes', 'annule', 'annulee', 'annulees',
+    'annuler', 'franc', 'francs', 'fcfa', 'cfa', 'ok', 'vendu', 'vendue', 'deja', 'numero',
+    'nouvelle', 'recu', 'recue', 'encaisse', 'encaissee', 'confirme', 'confirmee', 'verifie', 'verifiee',
+    'officiel', 'officielle', 'sigmamarket', 'admin',
+  ];
+  /** Les sosies grecs et cyrilliques des lettres latines (comme SOSIES de src/domain/vitrine.ts). */
+  const SOSIES = {
+    а: 'a', е: 'e', о: 'o', р: 'p', с: 'c', у: 'y', х: 'x', к: 'k', м: 'm', н: 'h', т: 't', в: 'b',
+    і: 'i', ј: 'j', ѕ: 's', ԁ: 'd', α: 'a', ε: 'e', ο: 'o', ρ: 'p', κ: 'k', ν: 'v', υ: 'u', τ: 't',
+    ι: 'i', χ: 'x',
+  };
+  /** Un mot de l'application, même déguisé (accents à part, lettres larges, sosies, écritures mêlées). */
+  function contientMotDeLApplication(texte) {
+    return String(texte).split(/\s+/).some(function (mot) {
+      let plat = mot.normalize('NFKD').toLowerCase().replace(/[̀-ͯ]/g, '').replace(/['’-]/g, '');
+      if (/[a-zß-ɏ]/.test(plat) && /[Ͱ-ԯ]/.test(plat)) return true;
+      let latin = Array.from(plat, function (c) { return SOSIES[c] || c; }).join('');
+      return MOTS_DE_L_APPLICATION.indexOf(latin) >= 0;
+    });
+  }
+
+  /**
    * Le prénom tel que l'application le dira (copie de prenomLisible) : des lettres, au plus deux
-   * mots, un trait d'union ou une apostrophe entre deux lettres ; sinon rien.
+   * mots, un trait d'union ou une apostrophe entre deux lettres, et aucun mot que l'application dit
+   * elle-même ; sinon rien.
    */
   function prenomLisible(prenom) {
     let mots = 1;
@@ -124,7 +150,7 @@
       }
       avant = 's';
     }
-    return avant === 'l' ? prenom : '';
+    return avant === 'l' && !contientMotDeLApplication(prenom) ? prenom : '';
   }
 
   function versUtf8(texte) {
@@ -319,12 +345,19 @@
 
   // ---------------------------------------------------------------- petites photos (D54)
 
-  /** Le serveur auquel la page accepte de parler : un projet Supabase (https) ou le serveur d'essai. */
+  /**
+   * Le serveur d'où la page accepte de charger des images : le projet Supabase de SigmaMarket, dont la
+   * référence est posée dans reglages.js (chargé avant), ou (essais) le serveur d'essai d'un ordinateur
+   * local. Aucun autre, pas même un autre projet Supabase : un catalogue n'est pas signé, et celui qui
+   * le fabrique ne doit pas pouvoir faire charger ses images (ni voir qui ouvre la page).
+   */
   function serveurPermis(url) {
-    return SUPABASE.test(url) || ESSAI.test(url);
+    let r = racine.SIGMA_REGLAGES;
+    return !!r && r.serveurPermis(url);
   }
   function estServeurCourt(court) {
-    return court.length <= SERVEUR_COURT_MAX && court.slice(-1) !== '/' && (/^[a-z0-9]{20}$/.test(court) || ESSAI.test(court));
+    let r = racine.SIGMA_REGLAGES;
+    return court.length <= SERVEUR_COURT_MAX && court.slice(-1) !== '/' && !!r && r.serveurCourtPermis(court);
   }
   /** « abcdefghijklmnopqrst » → https://abcdefghijklmnopqrst.supabase.co ; null si le serveur n'est pas permis. */
   function urlDuServeur(court) {
@@ -580,6 +613,7 @@
     BORNES: BORNES,
     nettoyerTexte: nettoyerTexte,
     prenomLisible: prenomLisible,
+    MOTS_DE_L_APPLICATION: MOTS_DE_L_APPLICATION,
     versUtf8: versUtf8,
     versBase64url: versBase64url,
     depuisBase64url: depuisBase64url,

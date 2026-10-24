@@ -151,6 +151,19 @@ svg{display:block}
 .champ{display:flex;align-items:center;height:64px;margin-top:12px;padding:0 14px;border:2px solid var(--argile);border-radius:20px;background:var(--ivoire)}
 .champ .ico{color:var(--encre-douce);margin-right:10px}
 .champ input{flex:1;min-width:0;height:56px;border:0;background:none;font:inherit;font-size:18px;color:var(--encre);outline:none}
+/* Le numéro, pays par pays (D64) : le drapeau et l'indicatif devant les chiffres, la liste des drapeaux à part */
+.champ.tel{padding:0 12px 0 6px}
+.drapeau-bouton{display:flex;align-items:center;flex:none;height:52px;margin-right:8px;padding:0 6px;border-radius:14px;background:var(--lin);border:1px solid var(--sable)}
+.drapeau-bouton .indicatif{margin:0 2px 0 8px;font-size:17px;font-weight:800}
+.drapeau-bouton .ico{width:22px;height:22px;margin:0;color:var(--encre-douce)}
+.drapeau{width:36px;height:24px;border-radius:4px;border:1px solid var(--sable);flex:none}
+.liste-pays{padding:4px 12px 12px}
+.ligne-pays{display:flex;align-items:center;width:100%;min-height:64px;margin-top:8px;padding:8px 10px;border:2px solid var(--sable);border-radius:16px;background:var(--lin);text-align:left}
+.ligne-pays.choisi{border-color:var(--vert);background:var(--ivoire)}
+.ligne-pays .drapeau{width:60px;height:40px;margin-right:12px;border-radius:6px}
+.ligne-pays .nom-pays{flex:1;min-width:0;font-weight:700;line-height:20px}
+.ligne-pays .ind-pays{margin-left:8px;font-weight:800;color:var(--encre-douce)}
+.compte-chiffres{margin:6px 4px 0;text-align:right;font-size:15px;font-weight:700;color:var(--encre-douce)}
 .erreur{margin:48px 16px 0;text-align:center}
 .rond-erreur{width:96px;height:96px;margin:0 auto 16px;border-radius:48px;background:var(--rouge-clair);color:var(--rouge);display:flex;align-items:center;justify-content:center}
 .rond-erreur.neutre{background:var(--lin);color:var(--encre)}
@@ -158,16 +171,23 @@ svg{display:block}
 .erreur h1{margin:0 0 8px;font-size:22px;line-height:28px;font-weight:800}
 .erreur p{margin:0;font-size:17px;line-height:22px;color:var(--encre-douce)}
 .pied-page{margin:20px 16px 0;font-size:13px;line-height:18px;color:var(--encre-douce);text-align:center}
+.pied-info{margin:12px 16px 0;font-size:12px;line-height:17px;color:var(--encre-douce);text-align:center}
+.pied-info a{color:var(--indigo);font-weight:700;text-decoration:underline}
 noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text-align:center}
 
 /* Le live : en direct, le compte à rebours, les messages */
 .direct{display:inline-flex;align-items:center;height:32px;padding:0 12px;border-radius:16px;background:var(--rouge);color:var(--blanc);font-size:15px;font-weight:800;margin-right:10px}
 .direct .point{width:10px;height:10px;border-radius:5px;background:var(--blanc);margin-right:6px}
 .bandeau.alerte{background:var(--rouge-clair);border:2px solid var(--rouge);color:var(--encre)}
-.compte{display:flex;align-items:center;justify-content:center;margin-top:12px;height:96px;border-radius:24px;background:var(--lin);color:var(--encre);font-size:56px;line-height:60px;font-weight:800}
-.compte .ico{width:44px;height:44px;margin-right:12px}
-.compte.orange{background:var(--orange);color:var(--encre)}
-.compte.rouge{background:var(--rouge);color:var(--blanc)}
+/* Le temps pour payer (D57) : une pastille compacte, un anneau qui se vide et les chiffres. Vert, puis orange, puis rouge. */
+.compte{display:flex;align-items:center;justify-content:center;margin:12px 16px 0;height:80px;border-radius:40px;border:3px solid var(--vert-clair);background:var(--vert-clair);color:var(--vert);font-size:48px;line-height:52px;font-weight:800}
+.compte .anneau{width:52px;height:52px;margin-right:14px;flex:none}
+.compte .piste{fill:none;stroke:var(--sable);stroke-width:5}
+.compte .reste{fill:none;stroke:var(--vert);stroke-width:5;stroke-linecap:round}
+.compte.orange{background:var(--orange-clair);border-color:var(--orange);color:var(--orange-fonce)}
+.compte.orange .reste{stroke:var(--orange)}
+.compte.rouge{background:var(--rouge-clair);border-color:var(--rouge);color:var(--rouge)}
+.compte.rouge .reste{stroke:var(--rouge)}
 .arrivee{display:flex;align-items:center;justify-content:center;margin-top:12px;font-size:17px;font-weight:700;color:var(--encre-douce)}
 .arrivee .rang-gros{display:inline-flex;align-items:center;justify-content:center;min-width:56px;height:56px;padding:0 8px;margin-left:10px;border-radius:28px;background:var(--encre);color:var(--ivoire);font-size:28px;font-weight:800}
 .fin{margin:24px 16px 0;text-align:center}
@@ -183,11 +203,38 @@ noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text
 <body>
 <noscript><p>Pour commander, ouvre ce lien avec Chrome.</p></noscript>
 <div id="app"></div>
-<script src="live.js"></script>
+<script src="reglages.js?v=14"></script>
+<script src="live.js?v=14"></script>
+<script src="numero.js?v=14"></script>
 <script>
 (function () {
   'use strict';
   var L = window.VitrineLive;
+  var R = window.SIGMA_REGLAGES;
+  // Si numero.js manque (page recopiée sans lui, réseau coupé au mauvais moment), la page ne casse pas :
+  // un seul pays, la Côte d'Ivoire, dix chiffres, comme avant.
+  var N = window.VitrineNumero || (function () {
+    var ci = { c: 'CI', i: '225', n: 'Côte d’Ivoire', l: [10], g: [2, 2, 2, 2, 2], d: '07', f: [['r', 0, 0, 20.4, 40, '#F77F00'], ['r', 20, 0, 20.4, 40, '#FFFFFF'], ['r', 40, 0, 20.4, 40, '#009E60']] };
+    function chiffres(t) { return String(t || '').replace(/\D/g, ''); }
+    function grouper(t) { return t.replace(/(\d{2})(?=\d)/g, '$1 '); }
+    return {
+      PAYS: [ci], CHIFFRES_MAX: 15, chiffres: chiffres, grouper: grouper,
+      pays: function () { return ci; },
+      paysDe: function (e) { return chiffres(e).indexOf('225') === 0 ? ci : null; },
+      exemple: function () { return '07 00 00 00 00'; },
+      depuis: function (e) {
+        var d = chiffres(e);
+        return { pays: 'CI', national: d.indexOf('225') === 0 && d.length === 13 ? d.slice(3) : d };
+      },
+      analyser: function (saisie) {
+        var d = chiffres(saisie);
+        if (d.length === 13 && d.indexOf('225') === 0) d = d.slice(3);
+        var etat = d === '' ? 'vide' : d.length < 10 ? 'court' : d.length > 10 ? 'long' : 'bon';
+        return { etat: etat, e164: etat === 'bon' ? '225' + d : null, pays: 'CI', chiffres: d, attendus: [10], longueur: d.length };
+      },
+      texteRefus: function (a) { return a.etat === 'court' ? 'Il manque des chiffres. Dans ce pays, un numéro a 10 chiffres.' : 'Il y a trop de chiffres. Dans ce pays, un numéro a 10 chiffres.'; },
+    };
+  })();
   var NS = 'http://www.w3.org/2000/svg';
   var app = document.getElementById('app');
   var STOCKAGE = 'sigmamarket.live.';
@@ -202,6 +249,7 @@ noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text
   // Dessins (24 x 24), ceux de la vitrine, et le direct.
   var DESSINS = {
     plus: 'M10.5 3.5h3v7h7v3h-7v7h-3v-7h-7v-3h7z',
+    bas: 'M7 10l5 5 5-5z',
     moins: 'M3.5 10.5h17v3h-17z',
     coche: 'M3.3 12.6l2.2-2.2 4 4 9-9 2.2 2.2L9.5 18.8z',
     alerte: 'M12 2.5L1.5 21h21zm-1.4 6.5h2.8v6h-2.8zm0 7.6h2.8v2.6h-2.8z',
@@ -220,7 +268,7 @@ noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text
   };
 
   // live.js ne s'est pas chargé (navigateur d'avant 2015) : pas de page blanche.
-  if (!L) {
+  if (!L || !R) {
     app.appendChild(h('div', { class: 'bandeau alerte' }, ['Ce navigateur est trop ancien. Ouvre ce lien avec Chrome.']));
     return;
   }
@@ -240,6 +288,9 @@ noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text
     noeuds: {},
     envoi: false,
     photos: {},
+    // Le pays du numéro du client, et ce qu'il a déjà écrit quand il va choisir son pays.
+    pays: null,
+    brouillon: null,
   };
 
   // ------------------------------------------------------------ petits outils
@@ -258,6 +309,27 @@ noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text
       e.appendChild(typeof c === 'string' || typeof c === 'number' ? document.createTextNode(String(c)) : c);
     });
     return e;
+  }
+  /** L'anneau du temps : une piste et, par-dessus, ce qui reste (il part du haut et se vide dans le sens des aiguilles). */
+  var RAYON_ANNEAU = 23;
+  function anneau() {
+    var s = document.createElementNS(NS, 'svg');
+    s.setAttribute('viewBox', '0 0 52 52');
+    s.setAttribute('class', 'anneau');
+    s.setAttribute('aria-hidden', 'true');
+    var piste = document.createElementNS(NS, 'circle');
+    var reste = document.createElementNS(NS, 'circle');
+    [piste, reste].forEach(function (c) {
+      c.setAttribute('cx', '26');
+      c.setAttribute('cy', '26');
+      c.setAttribute('r', String(RAYON_ANNEAU));
+    });
+    piste.setAttribute('class', 'piste');
+    reste.setAttribute('class', 'reste');
+    reste.setAttribute('transform', 'rotate(-90 26 26)');
+    s.appendChild(piste);
+    s.appendChild(reste);
+    return { svg: s, reste: reste };
   }
   function icone(nom, classe) {
     var s = document.createElementNS(NS, 'svg');
@@ -304,6 +376,58 @@ noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text
       else window.localStorage.setItem(STOCKAGE + cle, valeur);
     } catch (e) { /* stockage refusé : la page marche quand même */ }
   }
+  /**
+   * Ce que le navigateur garde du client (prénom, numéro, jeton de sa commande) a une FIN : 90 jours
+   * pour le prénom et le numéro, la fin de la commande (et quelques minutes) pour le jeton. Une valeur
+   * périmée, ou gardée sans date par une page d'avant, est effacée à la lecture : un téléphone prêté
+   * ne montre pas ce qu'un autre y a laissé.
+   */
+  function lireGardee(cle) {
+    var brut = lire(cle);
+    if (brut === null) return null;
+    var valeur = L.deballer(brut, Date.now());
+    if (valeur === null) ecrire(cle, null);
+    return valeur;
+  }
+  /**
+   * À l'ouverture de la page, quel que soit le live : tout ce qui a passé sa fin est effacé (le
+   * prénom et le numéro d'il y a plus de 90 jours, le jeton d'une commande finie d'un autre live),
+   * sans attendre qu'on rouvre le formulaire ou le même live.
+   */
+  function oublierPerimes() {
+    var cles = [];
+    try {
+      for (var i = 0; i < window.localStorage.length; i++) {
+        var k = window.localStorage.key(i);
+        if (k && k.indexOf(STOCKAGE) === 0) cles.push(k.slice(STOCKAGE.length));
+      }
+    } catch (e) { return; }
+    cles.forEach(function (cle) { lireGardee(cle); });
+  }
+  function garder(cle, valeur, jusqua) {
+    ecrire(cle, L.emballer(valeur, Date.now(), jusqua));
+  }
+  /** Le jeton de la commande qui attend : gardé jusqu'à sa fin (heure du navigateur) et quelques minutes. */
+  function garderJeton(code, jeton, commande) {
+    var finNavigateur = commande.expire_le - etat.ecart;
+    garder('jeton.' + code, jeton, Math.max(Date.now(), finNavigateur) + L.MARGE_COMMANDE_MS);
+  }
+  /** Le numéro WhatsApp du vendeur, tel qu'on l'écrit sous le texte (vide s'il n'en a pas mis). */
+  function contactBoutique() {
+    var n = etat.live ? L.numeroWhatsApp(etat.live.whatsapp) : null;
+    return n ? '+' + n : '';
+  }
+  /** Le petit texte d'information du bas de page (conditions d'utilisation, annexe B), dit aussi par « Écouter ». */
+  function information() {
+    return R.informationLive(nomBoutique() === 'Live' ? '' : nomBoutique(), contactBoutique());
+  }
+  /** L'avertissement, le petit texte d'information et le lien « Tes données ». */
+  function piedDePage() {
+    return h('div', {}, [
+      h('p', { class: 'pied-page' }, [GARDE]),
+      h('p', { class: 'pied-info' }, [information() + ' ', h('a', { href: R.PAGE_DONNEES }, ['Tes données'])]),
+    ]);
+  }
   function appeler(fonction, corps) {
     return L.appeler(function (u, i) { return window.fetch(u, i); }, etat.adresse.serveur, fonction, corps);
   }
@@ -344,6 +468,44 @@ noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text
     etat.message = { texte: texte, alerte: alerte !== false };
     vibrer();
     parler(texte);
+  }
+
+  // ------------------------------------------------------------ les numéros, pays par pays (D64)
+
+  /** Le drapeau d'un pays, dessiné d'après la liste de numero.js (cadre de 60 x 40). */
+  function drapeau(code) {
+    var s = document.createElementNS(NS, 'svg');
+    s.setAttribute('viewBox', '0 0 60 40');
+    s.setAttribute('preserveAspectRatio', 'none');
+    s.setAttribute('class', 'drapeau');
+    s.setAttribute('aria-hidden', 'true');
+    N.pays(code).f.forEach(function (f) {
+      var e;
+      if (f[0] === 'r') {
+        e = document.createElementNS(NS, 'rect');
+        e.setAttribute('x', f[1]); e.setAttribute('y', f[2]); e.setAttribute('width', f[3]); e.setAttribute('height', f[4]); e.setAttribute('fill', f[5]);
+      } else if (f[0] === 'c') {
+        e = document.createElementNS(NS, 'circle');
+        e.setAttribute('cx', f[1]); e.setAttribute('cy', f[2]); e.setAttribute('r', f[3]); e.setAttribute('fill', f[4]);
+      } else if (f[0] === 'p') {
+        e = document.createElementNS(NS, 'polygon');
+        e.setAttribute('points', f[1]); e.setAttribute('fill', f[2]);
+      } else if (f[0] === 'l') {
+        e = document.createElementNS(NS, 'line');
+        e.setAttribute('x1', f[1]); e.setAttribute('y1', f[2]); e.setAttribute('x2', f[3]); e.setAttribute('y2', f[4]);
+        e.setAttribute('stroke-width', f[5]); e.setAttribute('stroke', f[6]);
+      } else {
+        e = document.createElementNS(NS, 'polygon');
+        e.setAttribute('points', f[1]); e.setAttribute('fill', 'none'); e.setAttribute('stroke-width', f[2]); e.setAttribute('stroke', f[3]);
+      }
+      s.appendChild(e);
+    });
+    return s;
+  }
+  /** Le pays proposé d'abord : celui du numéro WhatsApp du vendeur (ses clients sont ses voisins), sinon la Côte d'Ivoire. */
+  function paysDuVendeur() {
+    var p = etat.live && etat.live.whatsapp ? N.paysDe(etat.live.whatsapp) : null;
+    return p ? p.c : 'CI';
   }
 
   // ------------------------------------------------------------ le panier
@@ -397,7 +559,8 @@ noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text
     }
     var tete = document.head;
     if (!tete) return;
-    tete.appendChild(h('meta', { 'http-equiv': 'Content-Security-Policy', content: 'img-src data: ' + origine }));
+    // Les images ET les appels réseau : une seconde règle ne fait que resserrer la première.
+    tete.appendChild(h('meta', { 'http-equiv': 'Content-Security-Policy', content: 'img-src data: ' + origine + '; connect-src ' + origine }));
     origineRestreinte = origine;
   }
   /**
@@ -508,7 +671,7 @@ noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text
     var t = nomBoutique() + '. Live en direct. Choisis tes articles avec le bouton plus, puis touche Commander. Après, tu auras ' +
       minutesPourPayer() + ' minutes pour payer le vendeur, sinon la commande s’annule.';
     if (l.length) t += ' Ton panier : ' + articles(combien(l)) + ', ' + total(l) + ' francs.';
-    return t + ' ' + GARDE;
+    return t + ' ' + GARDE + ' ' + information();
   }
 
   function vueArticles() {
@@ -535,7 +698,7 @@ noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text
     ]));
     etat.noeuds.grille = grille();
     app.appendChild(etat.noeuds.grille);
-    app.appendChild(h('p', { class: 'pied-page' }, [GARDE]));
+    app.appendChild(piedDePage());
     etat.noeuds.barre = barre();
     app.appendChild(etat.noeuds.barre);
     plusTard(rafraichirArticles, SUIVI_ARTICLES_MS);
@@ -575,7 +738,7 @@ noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text
     app.className = '';
     app.textContent = '';
     app.appendChild(entete('Ta commande', vueArticles, function () {
-      return 'Écris ton prénom et ton numéro de téléphone, puis touche Commander. Tu auras ' + minutesPourPayer() + ' minutes pour payer le vendeur.';
+      return 'Écris ton prénom et ton numéro de téléphone, puis touche Commander. Tu auras ' + minutesPourPayer() + ' minutes pour payer le vendeur. ' + GARDE + ' ' + information();
     }));
     var message = bandeauMessage();
     if (message) app.appendChild(message);
@@ -587,30 +750,60 @@ noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text
         h('span', { class: 'ligne-prix' }, [montant(x.quantite * x.prix)]),
       ]);
     }).concat([h('div', { class: 'total-panier' }, [h('span', { class: 'combien' }, [articles(combien(l))]), h('span', { class: 'montant' }, [montant(total(l))])])])));
+    var brouillon = etat.brouillon || {};
+    var donne = N.depuis(lireGardee('telephone'), paysDuVendeur());
+    if (etat.pays === null) etat.pays = donne.pays;
+    var lePays = N.pays(etat.pays);
     var prenom = h('input', { type: 'text', maxlength: String(L.BORNES.prenom), autocomplete: 'given-name', 'aria-label': 'Ton prénom', placeholder: 'Ton prénom' });
-    prenom.value = lire('prenom') || '';
-    var telephone = h('input', { type: 'tel', inputmode: 'tel', maxlength: '20', autocomplete: 'tel', 'aria-label': 'Ton numéro de téléphone', placeholder: '07 00 00 00 00' });
-    telephone.value = lire('telephone') || '';
+    prenom.value = brouillon.prenom !== undefined ? brouillon.prenom : (lireGardee('prenom') || '');
+    var telephone = h('input', { type: 'tel', inputmode: 'numeric', maxlength: String(N.CHIFFRES_MAX + 6), autocomplete: 'tel-national', 'aria-label': 'Ton numéro de téléphone', placeholder: N.exemple(etat.pays) });
+    telephone.value = brouillon.telephone !== undefined ? brouillon.telephone : (donne.pays === etat.pays ? N.grouper(donne.national, lePays.g) : '');
+    etat.brouillon = null;
+    var autrePays = h('button', {
+      class: 'drapeau-bouton', type: 'button',
+      'aria-label': 'Pays du numéro : ' + lePays.n + ', indicatif ' + lePays.i + '. Toucher pour changer de pays',
+      onclick: function () { etat.brouillon = { prenom: prenom.value, telephone: telephone.value }; vuePays(); },
+    }, [drapeau(etat.pays), h('span', { class: 'indicatif' }, ['+' + lePays.i]), icone('bas')]);
     app.appendChild(h('div', { class: 'carte' }, [
       h('label', { class: 'champ' }, [icone('personne'), prenom]),
-      h('label', { class: 'champ' }, [icone('telephone'), telephone]),
+      h('div', { class: 'champ tel' }, [autrePays, telephone]),
       h('button', {
         class: 'bouton valider large geant espace', 'aria-label': 'Commander',
         onclick: function () { commander(prenom.value, telephone.value); },
       }, [icone('coche'), 'Commander']),
       h('p', { class: 'note' }, ['Le vendeur voit ton prénom et ton numéro, pour le paiement.']),
     ]));
-    app.appendChild(h('p', { class: 'pied-page' }, [GARDE]));
+    app.appendChild(piedDePage());
+  }
+
+  /** La liste des drapeaux : chaque pays se reconnaît à son dessin, et se dit à voix haute quand on le touche. */
+  function vuePays() {
+    arreter();
+    etat.vue = 'pays';
+    app.className = '';
+    app.textContent = '';
+    app.appendChild(entete('Pays du numéro', vueFormulaire, 'Touche le drapeau du pays où ton numéro marche.'));
+    app.appendChild(h('div', { class: 'carte liste-pays' }, N.PAYS.map(function (p) {
+      return h('button', {
+        class: 'ligne-pays' + (p.c === etat.pays ? ' choisi' : ''), type: 'button',
+        'aria-label': p.n + ', indicatif ' + p.i,
+        onclick: function () { etat.pays = p.c; parler(p.n); vueFormulaire(); },
+      }, [drapeau(p.c), h('span', { class: 'nom-pays' }, [p.n]), h('span', { class: 'ind-pays' }, ['+' + p.i])]);
+    })));
   }
 
   function commander(prenom, telephone) {
     if (etat.envoi) return;
     var p = sansCoche(prenom).slice(0, L.BORNES.prenom);
-    var t = L.chiffres(telephone);
-    if (!p) { dire(L.texteRefus('prenom_manquant')); vueFormulaire(); return; }
-    if (t.length < 8 || t.length > 15) { dire(L.texteRefus('telephone_invalide')); vueFormulaire(); return; }
-    ecrire('prenom', p);
-    ecrire('telephone', t);
+    // Le numéro est jugé pour le pays du drapeau (nombre de chiffres, début) ; il part avec son indicatif.
+    var a = N.analyser(telephone, etat.pays);
+    var t = a.e164;
+    var brouillon = { prenom: prenom, telephone: telephone };
+    if (!p) { etat.brouillon = brouillon; dire(L.texteRefus('prenom_manquant')); vueFormulaire(); return; }
+    if (a.etat === 'vide') { etat.brouillon = brouillon; dire(L.texteRefus('telephone_invalide')); vueFormulaire(); return; }
+    if (t === null || t.length < 8 || t.length > N.CHIFFRES_MAX) { etat.brouillon = brouillon; dire(N.texteRefus(a)); vueFormulaire(); return; }
+    garder('prenom', p, Date.now() + L.MEMOIRE_CLIENT_MS);
+    garder('telephone', t, Date.now() + L.MEMOIRE_CLIENT_MS);
     etat.envoi = true;
     appeler('live_commander', {
       p_code: etat.adresse.code,
@@ -619,9 +812,9 @@ noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text
       etat.envoi = false;
       if (r && r.ok) {
         etat.jeton = r.jeton;
-        ecrire('jeton.' + etat.adresse.code, r.jeton);
         etat.commande = r.commande;
         etat.ecart = r.maintenant - Date.now();
+        garderJeton(etat.adresse.code, r.jeton, r.commande);
         etat.panier = {};
         vibrer();
         parler('Commande enregistrée. Tu as ' + L.minutesRestantes(L.resteAPayerMs(r.commande.expire_le, Date.now(), etat.ecart)) +
@@ -631,8 +824,12 @@ noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text
       }
       var refus = r && r.refus;
       if (refus === 'stock_insuffisant' && r.detail) {
+        // Le serveur ne dit plus le stock exact : « plus que 2 » (3 ou moins), « épuisé », ou « disponible »
+        // (plus de 3, mais moins que demandé) : le panier retombe alors à 3, qui est sûr de passer.
         r.detail.forEach(function (d) {
-          if (d.reste > 0) etat.panier[d.numero] = Math.min(etat.panier[d.numero] || 0, d.reste); else delete etat.panier[d.numero];
+          if (d.reste > 0) etat.panier[d.numero] = Math.min(etat.panier[d.numero] || 0, d.reste);
+          else if (d.niveau === 'epuise' || d.reste === 0) delete etat.panier[d.numero];
+          else etat.panier[d.numero] = Math.min(etat.panier[d.numero] || 0, 3);
         });
       }
       if (refus === 'article_absent' && r.detail) r.detail.forEach(function (n) { delete etat.panier[n]; });
@@ -659,7 +856,7 @@ noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text
     var reste = L.resteAPayerMs(c.expire_le, Date.now(), etat.ecart);
     return 'Commande numéro ' + c.rang + ', ' + total(c.lignes.map(function (x) { return { quantite: x.quantite, prix: x.prix_unitaire }; })) +
       ' francs. Il te reste ' + L.minutesRestantes(reste) + ' minutes pour payer le vendeur. Quand il a reçu l’argent, il valide ta commande. ' +
-      'Sinon elle s’annule seule. ' + GARDE;
+      'Sinon elle s’annule seule. ' + GARDE + ' ' + information();
   }
   function texteFin(c) {
     if (c.annulee_par === 'temps') return ['Temps fini', 'Ta commande est annulée : le temps pour payer est passé.'];
@@ -684,17 +881,21 @@ noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text
         h('p', {}, [fin[1]]),
       ]));
     } else {
-      etat.noeuds.compte = h('div', { class: 'compte', role: 'timer', 'aria-live': 'off' }, [icone('horloge'), h('span', {}, [''])]);
+      etat.baseTemps = 0;
+      etat.noeuds.anneau = anneau();
+      etat.noeuds.compte = h('div', { class: 'compte', role: 'timer', 'aria-live': 'off' }, [etat.noeuds.anneau.svg, h('span', {}, [''])]);
       app.appendChild(etat.noeuds.compte);
       app.appendChild(h('div', { class: 'arrivee' }, ['Ta place', h('span', { class: 'rang-gros' }, [String(c.rang)])]));
       app.appendChild(h('div', { class: 'bandeau vieux' }, [
         h('div', { class: 'rang' }, [icone('horloge'), 'Paie maintenant le vendeur. Quand il a reçu l’argent, il valide ta commande. Sinon elle s’annule à la fin du temps.']),
       ]));
-      if (etat.live && etat.live.whatsapp) {
+      // Le numéro vient du serveur : des chiffres, ou pas de lien (jamais un texte qui change l'adresse).
+      var numeroVendeur = etat.live ? L.numeroWhatsApp(etat.live.whatsapp) : null;
+      if (numeroVendeur) {
         var texte = 'Bonjour, j’ai commandé pendant le live : numéro ' + c.rang + ', ' + c.prenom + ', ' +
           total(c.lignes.map(function (x) { return { quantite: x.quantite, prix: x.prix_unitaire }; })) + ' F. Comment je paie ?';
         app.appendChild(h('div', { class: 'carte' }, [
-          h('a', { class: 'bouton valider large', href: 'https://wa.me/' + etat.live.whatsapp + '?text=' + encodeURIComponent(texte), target: '_blank', rel: 'noopener noreferrer' },
+          h('a', { class: 'bouton valider large', href: 'https://wa.me/' + numeroVendeur + '?text=' + encodeURIComponent(texte), target: '_blank', rel: 'noopener noreferrer' },
             [icone('whatsapp'), 'Écrire au vendeur']),
         ]));
       }
@@ -718,7 +919,7 @@ noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text
         h('button', { class: 'bouton neutre large', 'aria-label': 'Commander encore', onclick: recommencer }, [icone('recommencer'), 'Commander encore']),
       ]));
     }
-    app.appendChild(h('p', { class: 'pied-page' }, [GARDE]));
+    app.appendChild(piedDePage());
   }
 
   /** Chaque seconde : le temps qui reste, et sa couleur. À zéro, la commande se relit (annulée par le temps). */
@@ -726,9 +927,20 @@ noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text
     var c = etat.commande;
     if (etat.vue !== 'commande' || !c || c.etat !== 'attente') return;
     var reste = L.resteAPayerMs(c.expire_le, Date.now(), etat.ecart);
-    var teinte = L.teinteCompteARebours(reste, etat.live ? etat.live.delai_ms : reste);
+    // Le temps de CETTE commande : celui du live, ou plus s'il en reste davantage (le vendeur a pu
+    // régler le live sur moins de temps après qu'elle soit arrivée) ; l'anneau ne dépasse jamais « plein ».
+    var base = Math.max(etat.live ? etat.live.delai_ms : 0, etat.baseTemps || 0, reste);
+    etat.baseTemps = base;
+    var teinte = L.teinteCompteARebours(reste, base);
     etat.noeuds.compte.className = 'compte' + (teinte === 'normal' ? '' : ' ' + teinte);
     etat.noeuds.compte.lastChild.textContent = L.formaterCompteARebours(reste);
+    // Un live.js plus ancien, resté en cache, n'a pas l'anneau : le chiffre et la couleur suffisent.
+    if (L.traitAnneau && L.partRestante) {
+      var trait = L.traitAnneau(L.partRestante(reste, base), RAYON_ANNEAU);
+      etat.noeuds.anneau.reste.setAttribute('stroke-dasharray', trait.tour + ' ' + trait.tour);
+      etat.noeuds.anneau.reste.setAttribute('stroke-dashoffset', String(trait.decalage));
+      etat.noeuds.anneau.reste.setAttribute('visibility', trait.vide ? 'hidden' : 'visible');
+    }
     if (reste <= 0) { suivreCommande(); return; }
     etat.horloge = setTimeout(tic, HORLOGE_MS);
   }
@@ -811,7 +1023,9 @@ noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text
         return;
       }
       recevoirVue(r);
-      etat.jeton = lire('jeton.' + etat.adresse.code);
+      // Le jeton a une fin : celle de la commande, et quelques minutes. Au-delà, il est effacé et la
+      // commande n'est plus montrée à qui rouvre la page sur ce téléphone.
+      etat.jeton = lireGardee('jeton.' + etat.adresse.code);
       if (!etat.jeton) { vueArticles(); return; }
       return appeler('live_ma_commande', { p_code: etat.adresse.code, p_jeton: etat.jeton }).then(function (m) {
         if (m && m.ok && m.commande.etat === 'attente') {
@@ -837,6 +1051,11 @@ noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text
     etat.hash = location.hash;
     etat.adresse = L.lireAdresseLive(location.href);
     if (!etat.adresse) {
+      // Le projet de SigmaMarket n'est pas encore posé dans reglages.js : la page ne parle à aucun autre serveur.
+      if (R.SERVEUR_OFFICIEL === '' && !R.essai) {
+        vueErreur('Page pas encore prête', 'Cette page n’est pas encore ouverte. Demande au vendeur de t’écrire quand elle le sera.');
+        return;
+      }
       vueErreur('Ce lien est abîmé', 'Demande au vendeur de te renvoyer le lien de son live.');
       return;
     }
@@ -848,6 +1067,7 @@ noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text
   window.addEventListener('hashchange', function () {
     if (location.hash !== etat.hash) demarrer();
   });
+  oublierPerimes();
   demarrer();
 })();
 </script>

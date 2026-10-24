@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#1C1C56">
+<title>Tes données</title>
+<!--
+  SigmaMarket · « Tes données » : ce que la vitrine et le live gardent du client, dit simplement.
+  Le lien est au bas de la vitrine (index.html) et du live (live.html) ; le petit texte de ces pages
+  (reglages.js, conditions d'utilisation annexe B) dit l'essentiel, celle-ci le détaille.
+  Aucun appel réseau, aucune dépendance. Le bouton d'écoute lit la page à voix haute.
+
+  À COMPLÉTER À LA PUBLICATION (docs/CONDITIONS-UTILISATION.md, partie 17) : le téléphone de l'éditeur
+  et l'adresse web de la politique de confidentialité complète, dans le dernier paragraphe.
+-->
+<style>
+:root{--creme:#FAF3E3;--ivoire:#FFFCF5;--encre:#24160D;--encre-douce:#5A4634;--indigo:#2A2A78;--sable:#E7DAC0}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:#FAF3E3;background:var(--creme);color:var(--encre);font:500 17px/24px system-ui,-apple-system,Roboto,'Segoe UI',sans-serif}
+main{max-width:480px;margin:0 auto;padding:16px 16px 40px}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+h1{margin:0;font-size:24px;line-height:30px;font-weight:800}
+h2{margin:24px 0 4px;font-size:18px;line-height:24px;font-weight:800;color:var(--indigo)}
+p{margin:0 0 8px}
+button{font:inherit;color:inherit;border:0;background:var(--indigo);color:#fff;border-radius:24px;min-width:48px;height:48px;padding:0 16px;cursor:pointer;font-weight:700}
+a{color:var(--indigo);font-weight:700}
+.retour{display:inline-block;margin-top:24px}
+</style>
+</head>
+<body>
+<main id="texte">
+<header>
+  <h1>Tes données</h1>
+  <button type="button" id="ecoute" aria-label="Écouter" hidden>Écouter</button>
+</header>
+
+<h2>Dans ton téléphone</h2>
+<p>La <strong>vitrine</strong> garde ton panier, et ton prénom si tu le mets, <strong>24 heures</strong> dans ton navigateur. Rien ne part tant que tu n’envoies pas ton panier à la boutique.</p>
+<p>Le <strong>live</strong> garde ton prénom et ton numéro <strong>90 jours au plus</strong>, pour remplir ta prochaine commande plus vite. Il garde aussi le code de ta commande jusqu’à sa fin, pour que tu la retrouves si tu rouvres la page. Ensuite, tout s’efface tout seul.</p>
+<p>Pour tout effacer tout de suite : dans ton navigateur, vide les « données de sites » de cette page.</p>
+
+<h2>Ce que la boutique reçoit</h2>
+<p>Quand tu commandes pendant un live, ton <strong>prénom</strong> et ton <strong>numéro</strong> vont à la boutique, pour ta commande et ton paiement. La boutique et ses employés les voient. Ton prénom peut être <strong>dit à voix haute</strong> par le téléphone de la boutique quand ta commande arrive : si le live est filmé, le public peut l’entendre. Ton numéro n’est pas dit.</p>
+
+<h2>Ce que garde le serveur de SigmaMarket</h2>
+<p>Ta commande du live (prénom, numéro, articles, montant) est gardée sur le serveur de SigmaMarket, en Europe, pour que la boutique la voie et la valide. Ton adresse internet ne sert qu’à empêcher les abus : elle n’est gardée que brouillée, jamais lisible.</p>
+
+<h2>Ce que SigmaMarket ne fait pas</h2>
+<p>SigmaMarket ne touche pas ton argent : tu paies la boutique directement. SigmaMarket ne vérifie ni les boutiques ni les prix. Ne paie qu’à un numéro que tu connais.</p>
+
+<h2>Tes droits, et qui contacter</h2>
+<p>Pour voir, corriger ou effacer ce que la boutique a de toi, écris à la boutique : son numéro WhatsApp est en bas de sa page. Pour ce que garde SigmaMarket, écris à l’éditeur de SigmaMarket (ses coordonnées sont dans les conditions d’utilisation et la politique de confidentialité).</p>
+
+<button type="button" id="retour" class="retour">Retour</button>
+</main>
+<script>
+(function () {
+  'use strict';
+  document.getElementById('retour').addEventListener('click', function () {
+    try { window.history.back(); } catch (e) { /* rien */ }
+  });
+  var bouton = document.getElementById('ecoute');
+  if (typeof window.speechSynthesis === 'undefined' || typeof window.SpeechSynthesisUtterance === 'undefined') return;
+  bouton.hidden = false;
+  bouton.addEventListener('click', function () {
+    try {
+      window.speechSynthesis.cancel();
+      var u = new window.SpeechSynthesisUtterance(document.getElementById('texte').innerText.replace(/Écouter|Retour/g, ''));
+      u.lang = 'fr-FR';
+      u.rate = 0.95;
+      window.speechSynthesis.speak(u);
+    } catch (e) { /* pas de voix sur ce téléphone */ }
+  });
+})();
+</script>
+</body>
+</html>

@@ -154,13 +154,17 @@ svg{display:block}
 .erreur h1{margin:0 0 8px;font-size:22px;line-height:28px;font-weight:800}
 .erreur p{margin:0;font-size:17px;line-height:22px;color:var(--encre-douce)}
 .pied-page{margin:20px 16px 0;font-size:13px;line-height:18px;color:var(--encre-douce);text-align:center}
+.pied-info{margin:12px 16px 0;font-size:12px;line-height:17px;color:var(--encre-douce);text-align:center}
+.pied-info a{color:var(--indigo);font-weight:700;text-decoration:underline}
 noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text-align:center}
 </style>
 </head>
 <body>
 <noscript><p>Cette page a besoin de JavaScript. Ouvre ce lien avec Chrome.</p></noscript>
 <div id="app"></div>
-<script src="format.js"></script>
+<script src="reglages.js?v=14"></script>
+<script src="format.js?v=14"></script>
+<script src="numero.js?v=14"></script>
 <script>
 // Sans TextEncoder (Edge 18, Safari iOS 10.0-10.2), toqr ne se charge pas : un remplaçant UTF-8.
 if (typeof TextEncoder === 'undefined') window.TextEncoder = function () {
@@ -722,6 +726,7 @@ return toQR;
 (function () {
   'use strict';
   var F = window.VitrineFormat;
+  var R = window.SIGMA_REGLAGES;
   var NS = 'http://www.w3.org/2000/svg';
   var app = document.getElementById('app');
   var STOCKAGE = 'sigmamarket.vitrine.';
@@ -755,7 +760,7 @@ return toQR;
   };
 
   // format.js ne s'est pas chargé (navigateur d'avant 2015, Opera Mini) : pas de page blanche.
-  if (!F) {
+  if (!F || !R) {
     app.appendChild(h('div', { class: 'bandeau chrome' }, [
       h('div', { class: 'dessin-chrome', 'aria-hidden': 'true' }, [h('span', { class: 'rond' }, [icone('navigateur')])]),
       h('div', { class: 'rang' }, ['Ce navigateur est trop ancien. Ouvre ce lien avec Chrome.']),
@@ -934,11 +939,20 @@ return toQR;
     return fait;
   }
 
-  /** L'avertissement, avec son dessin, et dit par le bouton d'écoute de chaque vue du client. */
+  /**
+   * Le petit texte d'information du bas de page (conditions d'utilisation, annexe B) : à qui est la
+   * page, ce que le navigateur garde (24 heures), à qui poser ses questions. Dit aussi par « Écouter ».
+   */
+  function information(cat) {
+    return R.informationVitrine(cat ? sansCoche(cat.boutique) : '', cat && cat.whatsapp ? F.formaterWhatsApp(cat.whatsapp) : '');
+  }
+
+  /** L'avertissement, avec son dessin, le petit texte d'information et « Tes données » ; dits par le bouton d'écoute de chaque vue du client. */
   function piedDePage(cat) {
     return h('div', {}, [
       h('div', { class: 'bandeau vieux' }, [h('div', { class: 'rang' }, [icone('alerte'), GARDE])]),
-      cat && cat.whatsapp ? h('p', { class: 'pied-page' }, ['Numéro de la boutique : ' + F.formaterWhatsApp(cat.whatsapp) + '.']) : null,
+      cat && cat.whatsapp ? h('p', { class: 'pied-page' }, ['Numéro de la boutique : ' + (window.VitrineNumero ? window.VitrineNumero.formater(cat.whatsapp) : F.formaterWhatsApp(cat.whatsapp)) + '.']) : null,
+      h('p', { class: 'pied-info' }, [information(cat) + ' ', h('a', { href: R.PAGE_DONNEES }, ['Tes données'])]),
     ]);
   }
 
@@ -1137,7 +1151,7 @@ return toQR;
     var texte = sansCoche(etat.cat.boutique) + '. ' + etat.texteJour + 'Choisis tes articles avec le bouton plus, puis touche Valider.';
     if (etat.repris) texte += ' Tu as déjà montré ce panier. Pour en faire un autre, touche Nouveau panier.';
     if (l.length) texte += ' Ton panier : ' + articles(F.nombreArticles(l)) + ', ' + F.totalPanier(l) + ' francs.';
-    return texte + ' ' + GARDE;
+    return texte + ' ' + GARDE + ' ' + information(etat.cat);
   }
   /** Le panier déjà montré, retrouvé en rouvrant la page : il a peut-être été vendu. */
   function bandeauRepris() {
@@ -1272,7 +1286,7 @@ return toQR;
     }
 
     var texteEcoute = function () {
-      return 'Montre ce code au vendeur. ' + articles(n) + (total ? ', total affiché ' + total + ' francs' : '') + '. Le prix se discute avec lui. ' + GARDE;
+      return 'Montre ce code au vendeur. ' + articles(n) + (total ? ', total affiché ' + total + ' francs' : '') + '. Le prix se discute avec lui. ' + GARDE + ' ' + information(cat);
     };
     app.appendChild(entete('Ton panier', 'panier', retourVitrine, texteEcoute));
     var chrome = bandeauChrome(null);
