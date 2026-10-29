@@ -3,18 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: https://*.supabase.co http://*:54321; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: https://*.supabase.co http://*:54321; connect-src https://*.supabase.co http://*:54321; worker-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#1C1C56">
 <title>Vitrine</title>
 <!--
-  SigmaMarket · page du client de la vitrine (mode sans serveur).
-  Le catalogue arrive dans l'adresse (#c=…), le panier repart dans l'adresse (#p=…) : rien ne passe
-  par un serveur, aucun appel réseau (la règle de sécurité ci-dessus l'interdit au navigateur).
-  Seule exception (D54) : les petites photos, chargées du stockage de la boutique, et de lui seul.
+  SigmaMarket · page du client de la vitrine.
+  Le catalogue arrive dans l'adresse (#c=…), le panier repart dans l'adresse (#p=…) : sans serveur,
+  le code QR et WhatsApp, comme toujours. Les petites photos (D54) viennent du stockage de la
+  boutique, et de lui seul.
+  La commande directe (D85, docs/COMMANDE-DIRECTE-CONTRAT.md) : un catalogue en version 3 porte le
+  code de la vitrine ; la page demande alors au serveur de SigmaMarket, et à lui seul (reseau.js,
+  la règle de sécurité ci-dessus puis resserrée à son origine), si la boutique reçoit les paniers.
+  Oui en 5 s : « Commander », « Envoyer à … » et le suivi ; sinon, le parcours d'aujourd'hui.
   Formats : format.js, copie de src/domain/vitrine.ts, vérifiée par tests/domain/vitrine.test.ts.
-  ES2015, sans dépendance ; QR dessiné par toqr (MIT, licence plus bas).
+  ES2015, sans dépendance ; QR dessiné par toqr (MIT, licence plus bas). sw.js garde la page dans le
+  téléphone, pour qu'elle s'ouvre sans réseau.
 -->
 <style>
 :root{--creme:#FAF3E3;--ivoire:#FFFCF5;--blanc:#FFFFFF;--lin:#F1E6CF;--sable:#E7DAC0;--argile:#8F7757;--encre:#24160D;--encre-douce:#5A4634;--indigo:#2A2A78;--indigo-vif:#4141A0;--vert:#0B5F2F;--vert-clair:#DDF1DF;--rouge:#9E141A;--rouge-clair:#FBE3DE;--orange:#F28C16;--orange-fonce:#8A3C00;--orange-clair:#FDEBD0;--ombre-1:0 1px 3px rgba(36,22,13,.16);--ombre-2:0 3px 8px rgba(36,22,13,.22)}
@@ -157,14 +162,119 @@ svg{display:block}
 .pied-info{margin:12px 16px 0;font-size:12px;line-height:17px;color:var(--encre-douce);text-align:center}
 .pied-info a{color:var(--indigo);font-weight:700;text-decoration:underline}
 noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text-align:center}
+
+/* La vitrine en ligne (D85) : « Commander », « Ton panier », le suivi « Ton panier n° 4 » */
+.ico.petite{width:20px;height:20px;margin-right:8px;vertical-align:-4px;display:inline-block}
+.marge{margin:12px 16px 0}
+.centre{text-align:center}
+.note.centre{text-align:center}
+.note .ico.petite{color:var(--encre-douce)}
+.p-marge,.note.marge{margin:12px 16px 0}
+.attente{margin:48px 16px 0;display:flex;flex-direction:column;align-items:center;font-size:18px;font-weight:700;color:var(--encre-douce)}
+.anneau{display:inline-block;width:28px;height:28px;margin:0 10px 0 0;border-radius:50%;border:4px solid currentColor;border-right-color:transparent;animation:tourne .9s linear infinite;flex:none}
+.attente .anneau{width:44px;height:44px;margin:0 0 12px;color:var(--indigo)}
+@keyframes tourne{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.anneau{animation-duration:3s}}
+.bouton.petit{height:48px;padding:0 14px;font-size:16px;border-width:2px}
+.bouton.petit .ico{width:24px;height:24px}
+.bouton.en-cours{opacity:.85}
+.prix-boutique{display:block;width:100%;padding:16px 4px;text-align:center;font-size:15px;font-weight:700;color:var(--encre-douce)}
+.compteur .bouton.petit{white-space:normal;line-height:18px;text-align:left}
+.pied-garde{margin:20px 16px 0;font-size:13px;line-height:18px;color:var(--encre-douce);text-align:center}
+.pied-garde a,.lien-discret{color:var(--indigo);font-weight:700;text-decoration:underline}
+.lien-discret{min-height:48px;padding:0 8px;font-size:15px}
+.lien-discret.grand{min-height:64px;font-size:16px}
+.rang-liens{display:flex;justify-content:space-between;margin-top:4px}
+.vignette{position:relative;flex:none;width:56px;height:56px;margin-right:10px}
+.mini{display:block;width:56px;height:56px;border-radius:12px;object-fit:cover;background:var(--lin)}
+.mini.sans{font-size:16px;line-height:56px;font-weight:800;text-align:center}
+.fois{position:absolute;right:-4px;bottom:-4px;min-width:26px;height:22px;padding:0 5px;border-radius:11px;background:var(--encre);color:var(--ivoire);border:2px solid var(--ivoire);font-size:12px;line-height:18px;font-weight:800;text-align:center}
+.vignettes{display:flex;flex-wrap:wrap}
+.dernier .rang-titre{display:flex;align-items:center;font-size:16px;font-weight:800}
+.dernier .rang-titre .ico{margin-right:8px;color:var(--vert)}
+.rang-dernier{display:flex;align-items:center;justify-content:space-between;margin-top:10px}
+.rang-dernier .bouton{padding:0 12px;font-size:16px}
+.etiquette-champ{display:block;margin-top:14px;font-size:16px;font-weight:800}
+.etiquette-champ:first-child{margin-top:0}
+.facultatif{font-weight:600;color:var(--encre-douce)}
+.champ.faux{border-color:var(--orange)}
+.champ.tel{padding:0 12px 0 6px}
+.coche-verte{flex:none;width:40px;height:40px;border-radius:20px;background:var(--vert);color:var(--blanc);display:flex;align-items:center;justify-content:center}
+/* Le numéro bon : la coche se pose au coin du champ, hors de la ligne, pour ne jamais cacher un chiffre (v19, page à 360 px). */
+.champ.tel{position:relative}
+.champ.tel.bon{border-color:var(--vert);border-width:3px}
+.champ.tel .coche-verte{position:absolute;top:-12px;right:-10px;width:30px;height:30px;border-radius:15px;border:2px solid var(--ivoire)}
+.coche-verte .ico{fill:var(--blanc);color:var(--blanc);width:20px;height:20px}
+.aide-erreur{margin:6px 4px 0;font-size:16px;line-height:20px;font-weight:800;color:var(--orange-fonce)}
+.drapeau-bouton{display:flex;align-items:center;flex:none;height:52px;margin-right:8px;padding:0 6px;border-radius:14px;background:var(--lin);border:1px solid var(--sable)}
+.drapeau-bouton .indicatif{margin:0 2px 0 8px;font-size:17px;font-weight:800}
+.drapeau-bouton .ico{width:22px;height:22px;margin:0;color:var(--encre-douce)}
+.drapeau{width:36px;height:24px;border-radius:4px;border:1px solid var(--sable);flex:none}
+.liste-pays{padding:4px 12px 12px}
+.ligne-pays{display:flex;align-items:center;width:100%;min-height:64px;margin-top:8px;padding:8px 10px;border:2px solid var(--sable);border-radius:16px;background:var(--lin);text-align:left}
+.ligne-pays.choisi{border-color:var(--vert);background:var(--ivoire)}
+.ligne-pays .drapeau{width:60px;height:40px;margin-right:12px;border-radius:6px}
+.ligne-pays .nom-pays{flex:1;min-width:0;font-weight:700;line-height:20px}
+.ligne-pays .ind-pays{margin-left:8px;font-weight:800;color:var(--encre-douce)}
+.identite{display:flex;align-items:center}
+.identite .qui{flex:1;min-width:0;margin-left:10px;display:flex;flex-direction:column}
+.identite .prenom{font-size:18px;font-weight:800}
+.identite .numero-client{font-size:17px;font-weight:700;color:var(--encre-douce)}
+.crayon{flex:none;width:56px;height:56px;border-radius:16px;border:3px solid var(--encre);display:flex;align-items:center;justify-content:center}
+.titre-petit{font-size:16px;font-weight:800}
+.etapes-apres{display:flex;align-items:flex-start;justify-content:space-between;margin-top:10px}
+.etape-apres{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;text-align:center;font-size:14px;line-height:18px;font-weight:700}
+.rond-etape{flex:none;width:44px;height:44px;margin-bottom:6px;border-radius:22px;background:var(--lin);display:flex;align-items:center;justify-content:center}
+.fleche-petite{width:18px;height:18px;margin-top:13px;color:var(--argile)}
+.argent{display:flex;align-items:flex-start;margin:12px 16px 0;padding:10px 12px;border-radius:16px;background:var(--lin);font-size:15px;line-height:20px;font-weight:600}
+.argent .ico{margin-right:10px;color:var(--vert)}
+.zone-envoi{margin:16px 16px 0}
+.petit-code .qr{max-width:160px}
+.titre-carte.petit{font-size:16px;font-weight:700}
+.titre-carte.petit .ico{width:24px;height:24px}
+.bloc-en-cause{margin:4px -8px;padding:4px 8px 10px;border:2px solid var(--orange);border-radius:16px;background:var(--orange-clair)}
+.phrase-en-cause{margin:2px 0 0;font-size:17px;line-height:22px;font-weight:800}
+.ligne.grisee{opacity:.55}
+.ligne.grisee .mini{filter:grayscale(1)}
+.ticket{display:flex;align-items:center}
+.rond-numero{flex:none;width:80px;height:80px;border-radius:40px;background:var(--encre);color:var(--ivoire);font-size:44px;line-height:80px;font-weight:800;text-align:center;margin-right:14px}
+.rond-numero.petit{width:48px;height:48px;font-size:24px;line-height:48px}
+.ticket-texte{display:flex;flex-direction:column;min-width:0}
+.ticket-titre{font-size:20px;line-height:24px;font-weight:800}
+.ticket-date{margin-top:2px;font-size:15px;font-weight:600;color:var(--encre-douce)}
+.etapes{display:flex;justify-content:space-between;margin:14px 16px 0}
+.etape{flex:1;display:flex;flex-direction:column;align-items:center;text-align:center;color:var(--argile)}
+.rond-coche{width:52px;height:52px;border-radius:26px;border:3px dashed var(--argile);display:flex;align-items:center;justify-content:center}
+.etape.faite{color:var(--encre)}
+.etape.faite .rond-coche{border:0;background:var(--vert);color:var(--blanc)}
+.etape-nom{margin-top:4px;font-size:15px;font-weight:800}
+.etape-heure{font-size:14px;font-weight:600;min-height:18px}
+.maintenant{display:flex;align-items:flex-start}
+.maintenant .rond-etape{margin:0 10px 0 0}
+.maintenant .bloc{display:block;margin-top:2px;font-size:15px;line-height:20px;font-weight:600}
+.mise-a-jour{display:flex;align-items:center;justify-content:space-between}
+.mise-a-jour .note{margin:0 8px 0 0}
+.lien-suivi{margin:8px 0 0;padding:8px;border-radius:10px;background:var(--lin);font-size:12px;line-height:16px;word-break:break-all}
+.fin{margin:24px 16px 0;text-align:center}
+.rond-fin{position:relative;width:104px;height:104px;margin:0 auto 12px;border-radius:52px;display:flex;align-items:center;justify-content:center;background:var(--lin);color:var(--encre)}
+.rond-fin.vert{background:var(--vert);color:var(--blanc)}
+.rond-fin .ico{width:56px;height:56px}
+.coche-fin{position:absolute;right:0;bottom:0;width:40px;height:40px;border-radius:20px;background:var(--blanc);color:var(--vert);border:3px solid var(--vert);display:flex;align-items:center;justify-content:center}
+.coche-fin .ico{width:26px;height:26px}
+.fin h1{margin:0;font-size:24px;line-height:30px;font-weight:800}
+.fin-ligne{flex:none;width:36px;height:36px;border-radius:18px;display:flex;align-items:center;justify-content:center}
+.fin-ligne.oui{background:var(--vert);color:var(--blanc)}
+.fin-ligne.non,.fin-ligne.manque{background:var(--rouge-clair);color:var(--rouge)}
+.fin-ligne .ico{width:22px;height:22px}
 </style>
 </head>
 <body>
 <noscript><p>Cette page a besoin de JavaScript. Ouvre ce lien avec Chrome.</p></noscript>
 <div id="app"></div>
-<script src="reglages.js?v=14"></script>
-<script src="format.js?v=14"></script>
-<script src="numero.js?v=14"></script>
+<script src="reglages.js?v=15"></script>
+<script src="format.js?v=15"></script>
+<script src="numero.js?v=15"></script>
+<script src="reseau.js?v=15"></script>
 <script>
 // Sans TextEncoder (Edge 18, Safari iOS 10.0-10.2), toqr ne se charge pas : un remplaçant UTF-8.
 if (typeof TextEncoder === 'undefined') window.TextEncoder = function () {
@@ -727,19 +837,59 @@ return toQR;
   'use strict';
   var F = window.VitrineFormat;
   var R = window.SIGMA_REGLAGES;
+  // La vitrine en ligne (D85) : sans reseau.js, ou sans `fetch`, la page garde le parcours d'aujourd'hui.
+  var Res = window.VitrineReseau || null;
+  var B = Res ? Res.BORNES_EN_LIGNE : null;
+  // Si numero.js manque (page recopiée sans lui, réseau coupé au mauvais moment), la page ne casse pas :
+  // un seul pays, la Côte d'Ivoire, dix chiffres, comme la page du live.
+  var N = window.VitrineNumero || (function () {
+    var ci = { c: 'CI', i: '225', n: 'Côte d’Ivoire', l: [10], g: [2, 2, 2, 2, 2], d: '07', f: [['r', 0, 0, 20.4, 40, '#F77F00'], ['r', 20, 0, 20.4, 40, '#FFFFFF'], ['r', 40, 0, 20.4, 40, '#009E60']] };
+    function chiffres(t) { return String(t || '').replace(/\D/g, ''); }
+    function grouper(t) { return t.replace(/(\d{2})(?=\d)/g, '$1 '); }
+    return {
+      PAYS: [ci], CHIFFRES_MAX: 15, chiffres: chiffres, grouper: grouper,
+      pays: function () { return ci; },
+      estCode: function (c) { return c === 'CI'; },
+      paysDe: function (e) { return chiffres(e).indexOf('225') === 0 ? ci : null; },
+      exemple: function () { return '07 00 00 00 00'; },
+      formater: function (e) { var d = chiffres(e); return d.indexOf('225') === 0 ? '+225 ' + grouper(d.slice(3)) : '+' + d; },
+      depuis: function (e) {
+        var d = chiffres(e);
+        return { pays: 'CI', national: d.indexOf('225') === 0 && d.length === 13 ? d.slice(3) : d };
+      },
+      analyser: function (saisie) {
+        var d = chiffres(saisie);
+        if (d.length === 13 && d.indexOf('225') === 0) d = d.slice(3);
+        var etat = d === '' ? 'vide' : d.length < 10 ? 'court' : d.length > 10 ? 'long' : 'bon';
+        return { etat: etat, e164: etat === 'bon' ? '225' + d : null, pays: 'CI', chiffres: d, attendus: [10], longueur: d.length };
+      },
+      texteRefus: function (a) { return a.etat === 'court' ? 'Il manque des chiffres. Dans ce pays, un numéro a 10 chiffres.' : 'Il y a trop de chiffres. Dans ce pays, un numéro a 10 chiffres.'; },
+    };
+  })();
   var NS = 'http://www.w3.org/2000/svg';
   var app = document.getElementById('app');
   var STOCKAGE = 'sigmamarket.vitrine.';
   var DUREE_PANIER = 24 * 3600 * 1000;
+  /** Un envoi (identifiant, jeton, état) n'est jamais gardé plus longtemps : 24 h d'échéance, 24 h de prise, de la marge. */
+  var DUREE_ENVOI = 3 * 24 * 3600 * 1000;
+  /**
+   * Un panier servi reste suivi 30 minutes (toutes les minutes, page visible) : si la boutique défait
+   * la vente (une erreur de client, « Défaire »), le serveur le rend et la page repasse à ✓✓
+   * (SPECIFICATION.md, § 5.5). Ensuite, l'identifiant et le jeton sont oubliés.
+   */
+  var SUIVI_APRES_SERVI = 30 * 60 * 1000;
   var ANDROID = /Android/i.test(navigator.userAgent);
   var VOIX = typeof window.speechSynthesis !== 'undefined' && typeof window.SpeechSynthesisUtterance !== 'undefined';
   var GARDE = 'SigmaMarket ne vérifie ni les boutiques ni les prix. Ne paie qu’en main propre, ou à un numéro que tu connais.';
+  var ARGENT = 'Rien n’est payé ici. Paie seulement en main propre, ou à un numéro que tu connais.';
+  var MEME_PANIER = 'C’est le même panier : il ne sera pas compté deux fois.';
 
   // Dessins (24 x 24), faits pour cette page : un dessin, un sens.
   var DESSINS = {
     plus: 'M10.5 3.5h3v7h7v3h-7v7h-3v-7h-7v-3h7z',
     moins: 'M3.5 10.5h17v3h-17z',
     coche: 'M3.3 12.6l2.2-2.2 4 4 9-9 2.2 2.2L9.5 18.8z',
+    deuxCoches: 'M.8 12.9l1.8-1.8 3.4 3.4 7.6-7.6 1.8 1.8-9.4 9.4zm8.6 2.5l1.8-1.8 1.6 1.6 7.6-7.6 1.8 1.8-9.4 9.4z',
     alerte: 'M12 2.5L1.5 21h21zm-1.4 6.5h2.8v6h-2.8zm0 7.6h2.8v2.6h-2.8z',
     epuise: 'M12 2a10 10 0 100 20 10 10 0 000-20zm0 3a7 7 0 015.6 11.2L7.8 6.4A7 7 0 0112 5zm-7 7c0-1.6.5-3 1.4-4.2l9.8 9.8A7 7 0 015 12z',
     ecoute: 'M3 9v6h4l5 5V4L7 9zm13.5 3A4.5 4.5 0 0014 8v8a4.5 4.5 0 002.5-4zM14 3.2v2.1a7 7 0 010 13.4v2.1a9 9 0 000-17.6z',
@@ -757,6 +907,20 @@ return toQR;
     fleche: 'M4 10.5h11.6l-4.3-4.3 2.1-2.1 7.9 7.9-7.9 7.9-2.1-2.1 4.3-4.3H4z',
     lien: 'M12 2a10 10 0 100 20 10 10 0 000-20zm-1.4 5h2.8v7h-2.8zm0 8.5h2.8v2.8h-2.8z',
     code: 'M3 3h8v8H3zm2 2v4h4V5zm8-2h8v8h-8zm2 2v4h4V5zM3 13h8v8H3zm2 2v4h4v-4zm8-2h3v3h-3zm5 0h3v3h-3zm-5 5h3v3h-3zm5 0h3v3h-3zm-2.5-2.5h3v3h-3z',
+    boutique: 'M3 3.5h18l1.5 5.5a2.6 2.6 0 01-5 1 2.6 2.6 0 01-5.5 0 2.6 2.6 0 01-5.5 0 2.6 2.6 0 01-5-1zM4 12.8a4 4 0 002 .2V19h3v-4.5h6V19h3v-6a4 4 0 002-.2V21H4z',
+    appel: 'M6.6 10.8a15.2 15.2 0 006.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 013 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z',
+    mainPiece: 'M16.5 2a4.5 4.5 0 110 9 4.5 4.5 0 010-9zM1.5 13H5l6 2h3.2a1.8 1.8 0 010 3.5H10v1h4.8l5.6-3c1.4-.7 2.7.9 1.7 2L18 22H5v-1H1.5z',
+    billets: 'M1.5 5.5h17v10h-17zm2.5 2.5v5h12V8zm6 .5a2 2 0 110 4 2 2 0 010-4zM20 8h2.5v10.5H4.5V16H20z',
+    crayon: 'M3 17.2V21h3.8L17.8 10 14 6.2zM20.7 7.1a1 1 0 000-1.4l-2.4-2.4a1 1 0 00-1.4 0l-1.8 1.8 3.8 3.8z',
+    partager: 'M18 15.5a3 3 0 00-2.2 1L8.9 12.7a3 3 0 000-1.4l6.9-3.9A3 3 0 1015 5c0 .3 0 .5.1.7L8.2 9.6a3 3 0 100 4.8l6.9 3.9-.1.7a3 3 0 103-3.5z',
+    croix: 'M5.6 3.5L12 9.9l6.4-6.4 2.1 2.1-6.4 6.4 6.4 6.4-2.1 2.1-6.4-6.4-6.4 6.4-2.1-2.1 6.4-6.4-6.4-6.4z',
+    boiteVide: 'M3 7.5l9-4 9 4v10l-9 4-9-4zm2.5 2.3v6.2l5.3 2.4v-6.2zm13 0l-5.3 2.4v6.2l5.3-2.4z',
+    envoyer: 'M2 21l20.5-9L2 3v7l14.5 2L2 14z',
+    bouclier: 'M12 2l8 3v6c0 5.1-3.4 9.7-8 11-4.6-1.3-8-5.9-8-11V5zm-1.2 13.4l6-6-1.6-1.6-4.4 4.4-2.1-2.1-1.6 1.6z',
+    bas: 'M7 10l5 5 5-5z',
+    calendrier: 'M5 4h2V2h2v2h6V2h2v2h2a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2zm0 6v10h14V10zm4.1 2.6l1.4-1.4 1.5 1.5 1.5-1.5 1.4 1.4-1.5 1.5 1.5 1.5-1.4 1.4-1.5-1.5-1.5 1.5-1.4-1.4 1.5-1.5z',
+    drapeau: 'M5 2h2.5v1.5H19l-2 4.2 2 4.3H7.5V22H5z',
+    nuageBarre: 'M3.3 2.2l18.5 18.5-1.4 1.4-2.3-2.3H6.5A5 5 0 015.3 10 6 6 0 015.6 7.4L1.9 3.6zM12 4a7 7 0 016.9 6 4.5 4.5 0 012.5 7.7L8.7 5A7 7 0 0112 4z',
   };
 
   // format.js ne s'est pas chargé (navigateur d'avant 2015, Opera Mini) : pas de page blanche.
@@ -769,6 +933,11 @@ return toQR;
   }
   var INTEGRE = F.estNavigateurIntegre(navigator.userAgent);
 
+  // Gardée dans le téléphone (sw.js) : rouverte sans réseau, la vitrine garde le parcours d'aujourd'hui.
+  try {
+    if (navigator.serviceWorker && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(function () {});
+  } catch (e) { /* pas de travailleur sur ce navigateur */ }
+
   // ------------------------------------------------------------ petits outils
 
   function h(tag, attrs, enfants) {
@@ -776,7 +945,10 @@ return toQR;
     Object.keys(attrs || {}).forEach(function (k) {
       var v = attrs[k];
       if (v === null || v === undefined || v === false) return;
-      if (k.slice(0, 2) === 'on') e.addEventListener(k.slice(2), v);
+      if (k === 'onclick') {
+        // Un toucher : la page peut ensuite parler et vibrer d'elle-même (le navigateur l'exige).
+        e.addEventListener('click', function (ev) { etat.touche = true; return v.call(this, ev); });
+      } else if (k.slice(0, 2) === 'on') e.addEventListener(k.slice(2), v);
       else if (k === 'class') e.className = v;
       else e.setAttribute(k, v === true ? '' : v);
     });
@@ -806,7 +978,7 @@ return toQR;
   }
   /** Un nom de la boutique ou d'un article, sans coche (✅ ✔ ☑ ✓) : la page n'a jamais l'air « vérifiée ». */
   function sansCoche(t) {
-    return t.replace(/(\u2705|\u2611|\u2713|\u2714|\uD83D\uDDF8|\uD83D\uDDF9)\uFE0F?/g, '').replace(/\s+/g, ' ').replace(/^ | $/g, '');
+    return t.replace(/(✅|☑|✓|✔|🗸|🗹)️?/g, '').replace(/\s+/g, ' ').replace(/^ | $/g, '');
   }
   function vibrer() {
     try { if (navigator.vibrate) navigator.vibrate(200); } catch (e) { /* rien */ }
@@ -828,6 +1000,18 @@ return toQR;
       u.rate = 0.95;
       window.speechSynthesis.speak(u);
     } catch (e) { /* pas de voix sur ce téléphone */ }
+  }
+  function lire(cle) {
+    try { return JSON.parse(window.localStorage.getItem(cle) || 'null'); } catch (e) { return null; }
+  }
+  function ecrire(cle, valeur) {
+    try { window.localStorage.setItem(cle, JSON.stringify(valeur)); } catch (e) { /* navigation privée */ }
+  }
+  function effacer(cle) {
+    try { window.localStorage.removeItem(cle); } catch (e) { /* rien */ }
+  }
+  function hexa8(n) {
+    return ('00000000' + (n >>> 0).toString(16)).slice(-8);
   }
 
   function svg(tag, attrs) {
@@ -942,16 +1126,21 @@ return toQR;
   /**
    * Le petit texte d'information du bas de page (conditions d'utilisation, annexe B) : à qui est la
    * page, ce que le navigateur garde (24 heures), à qui poser ses questions. Dit aussi par « Écouter ».
+   * Sur le chemin en ligne (D85), il dit aussi ce qui part à la boutique et au serveur.
    */
   function information(cat) {
-    return R.informationVitrine(cat ? sansCoche(cat.boutique) : '', cat && cat.whatsapp ? F.formaterWhatsApp(cat.whatsapp) : '');
+    return R.informationVitrine(cat ? sansCoche(cat.boutique) : '', cat && cat.whatsapp ? F.formaterWhatsApp(cat.whatsapp) : '', !!etat.ligne);
+  }
+  function numeroBoutique(whatsapp) {
+    return window.VitrineNumero ? window.VitrineNumero.formater(whatsapp) : F.formaterWhatsApp(whatsapp);
   }
 
   /** L'avertissement, avec son dessin, le petit texte d'information et « Tes données » ; dits par le bouton d'écoute de chaque vue du client. */
   function piedDePage(cat) {
+    if (etat.ligne || etat.envoi) return piedEnLigne();
     return h('div', {}, [
       h('div', { class: 'bandeau vieux' }, [h('div', { class: 'rang' }, [icone('alerte'), GARDE])]),
-      cat && cat.whatsapp ? h('p', { class: 'pied-page' }, ['Numéro de la boutique : ' + (window.VitrineNumero ? window.VitrineNumero.formater(cat.whatsapp) : F.formaterWhatsApp(cat.whatsapp)) + '.']) : null,
+      cat && cat.whatsapp ? h('p', { class: 'pied-page' }, ['Numéro de la boutique : ' + numeroBoutique(cat.whatsapp) + '.']) : null,
       h('p', { class: 'pied-info' }, [information(cat) + ' ', h('a', { href: R.PAGE_DONNEES }, ['Tes données'])]),
     ]);
   }
@@ -971,13 +1160,24 @@ return toQR;
 
   // ------------------------------------------------------------ le panier du client, gardé 24 h
 
-  var etat = { cat: null, contenu: '', hash: null, panier: null, vue: '', tuiles: {}, barre: null, defile: 0, repris: false, texteJour: '', photos: {} };
+  var etat = {
+    cat: null, contenu: '', hash: null, panier: null, vue: '', tuiles: {}, barre: null, defile: 0, repris: false, texteJour: '', photos: {},
+    // La vitrine en ligne (D85).
+    ligne: null, serveur: null, code: '', origine: 'carre', envoi: null, touche: false, refaire: null, changements: [],
+    retourChrome: null, brouillon: null, erreurChamp: null, changerClient: false, pays: null, refusLignes: {}, cause: '',
+    lent: false, horsLigne: false, relecture: false, garder: false, annuler: '', signature: '', envoiEnVol: null,
+    repriseEnvoi: false, dejaVendu: false, catLien: null, champs: null,
+    // Le serveur a refusé une relecture (trop de demandes depuis cette adresse, partagée par beaucoup
+    // de téléphones) : la page le dit, et ne relit pas avant cette heure.
+    serveurOccupe: false, freineJusqua: 0,
+  };
 
   // ------------------------------------------------------------ les petites photos (D54)
 
   var origineRestreinte = null;
-  // Une seconde règle de sécurité resserre les images à l'origine du serveur de CE catalogue.
-  function restreindreImages(origine) {
+  // Une seconde règle de sécurité resserre les images (et, sur le chemin en ligne, les appels) à
+  // l'origine du serveur de CE catalogue.
+  function restreindreImages(origine, appels) {
     if (origine === origineRestreinte) return;
     if (origineRestreinte !== null) {
       if (typeof location.reload === 'function') location.reload();
@@ -985,12 +1185,17 @@ return toQR;
     }
     var tete = document.head;
     if (!tete) return;
-    tete.appendChild(h('meta', { 'http-equiv': 'Content-Security-Policy', content: 'img-src data: ' + origine }));
+    tete.appendChild(h('meta', { 'http-equiv': 'Content-Security-Policy', content: 'img-src data: ' + origine + (appels ? '; connect-src ' + origine : '') }));
     origineRestreinte = origine;
+  }
+  /** L'adresse de la petite photo d'un article : du catalogue (D54), ou du serveur (chemin en ligne). */
+  function adressePhotoDe(a) {
+    if (a.photoNom && Res) return Res.adressePhoto(etat.serveur, a.photoNom);
+    return etat.cat && etat.cat.photos ? F.adresseMiniature(etat.cat, a) : null;
   }
   // Une image par adresse, gardée d'un dessin à l'autre ; si elle ne vient pas, le numéro en grand.
   function photoDe(a) {
-    var adresse = F.adresseMiniature(etat.cat, a);
+    var adresse = adressePhotoDe(a);
     if (!adresse) return null;
     var p = etat.photos[adresse];
     if (p) return p;
@@ -1014,9 +1219,17 @@ return toQR;
     etat.photos[adresse] = p;
     return p;
   }
+  /** Une petite image (une ligne de panier, le dernier panier), ou le numéro dans un carré ; et la quantité en pastille. */
+  function vignette(numero, quantite, photoNom) {
+    var adresse = photoNom && Res ? Res.adressePhoto(etat.serveur, photoNom) : null;
+    return h('span', { class: 'vignette' }, [
+      adresse ? h('img', { class: 'mini', loading: 'lazy', alt: '', src: adresse }) : h('span', { class: 'mini sans' }, ['n°' + numero]),
+      quantite ? h('span', { class: 'fois' }, ['×' + quantite]) : null,
+    ]);
+  }
 
   function cleStockage() {
-    return STOCKAGE + ('00000000' + etat.cat.cle.toString(16)).slice(-8);
+    return STOCKAGE + hexa8(etat.cat.cle);
   }
   function tirerDemande() {
     var o = new Uint8Array(4);
@@ -1033,8 +1246,7 @@ return toQR;
    * catalogue (le QR du comptoir n'en porte qu'une partie). `montre` : les lignes déjà montrées.
    */
   function chargerPanier() {
-    var p = null;
-    try { p = JSON.parse(window.localStorage.getItem(cleStockage()) || 'null'); } catch (e) { p = null; }
+    var p = lire(cleStockage());
     var maintenant = Date.now();
     if (!p || typeof p !== 'object' || typeof p.t !== 'number' || maintenant - p.t > DUREE_PANIER || p.t > maintenant + 60000 ||
       typeof p.demande !== 'string' || !/^[0-9a-f]{8}$/.test(p.demande) || !p.q || typeof p.q !== 'object') return nouveauPanier();
@@ -1053,21 +1265,41 @@ return toQR;
   }
   function garder() {
     etat.panier.t = Date.now();
-    try { window.localStorage.setItem(cleStockage(), JSON.stringify(etat.panier)); } catch (e) { /* navigation privée */ }
+    ecrire(cleStockage(), etat.panier);
   }
   /** Les paniers montrés par ce téléphone (leur identifiant) : rouvert ici, un panier n'est pas reçu. */
   function faits() {
-    try { var f = JSON.parse(window.localStorage.getItem(STOCKAGE + 'faits')); if (Array.isArray(f)) return f; } catch (e) { /* rien */ }
-    return [];
+    var f = lire(STOCKAGE + 'faits');
+    return Array.isArray(f) ? f : [];
   }
+  function noterFait(d) {
+    ecrire(STOCKAGE + 'faits', faits().filter(function (x) { return x !== d; }).concat(d).slice(-50));
+  }
+  /**
+   * Les lignes du panier. Sur le chemin en ligne, sans les articles à prix demandé (ils ne se
+   * commandent pas en ligne) et 99 au plus par ligne, comme le serveur.
+   */
   function lignes() {
-    return F.lignesDuPanier(etat.cat, etat.panier.q);
+    var l = F.lignesDuPanier(etat.cat, etat.panier.q);
+    if (!etat.ligne) return l;
+    return l.filter(function (x) { return x.prixVu > 0; }).map(function (x) {
+      return { numero: x.numero, quantite: Math.min(x.quantite, B.quantite), prixVu: x.prixVu };
+    });
+  }
+  function articleDe(numero) {
+    return etat.cat.articles.filter(function (x) { return x.numero === numero; })[0] || null;
+  }
+  /** Le plus grand nombre que « + » accepte : sur le chemin en ligne, ce qui reste quand il en reste 1 à 3. */
+  function maxDe(numero) {
+    if (!etat.ligne) return F.BORNES.quantite;
+    var a = articleDe(numero);
+    return Math.min(B.quantite, a && a.reste > 0 ? a.reste : B.quantite);
   }
   function changer(numero, ecart) {
     var avant = lignes().length >= F.BORNES.lignes;
     var q = (etat.panier.q[numero] || 0) + ecart;
     if (q <= 0) delete etat.panier.q[numero];
-    else if (q <= F.BORNES.quantite) {
+    else if (q <= maxDe(numero)) {
       if (!etat.panier.q[numero] && avant) {
         parler(F.BORNES.lignes + ' articles différents au plus dans un panier.');
         vibrer();
@@ -1089,8 +1321,15 @@ return toQR;
     var fini = a.niveau === 'epuise';
     var plein = !q && lignes().length >= F.BORNES.lignes;
     var etiquettes = { disponible: ['coche', 'Disponible'], bientot_fini: ['alerte', 'Bientôt fini'], epuise: ['epuise', 'Épuisé'] };
+    var etiquette = etat.ligne && a.reste > 0 && !fini ? ['alerte', 'Plus que ' + a.reste] : etiquettes[a.niveau];
     var compteur = null;
-    if (!fini && q === 0) {
+    if (etat.ligne && a.prix === 0) {
+      // Prix demandé : il ne se commande pas en ligne ; on le demande à la boutique (D85).
+      var wa = etat.cat.whatsapp;
+      compteur = h('div', { class: 'compteur' }, [wa
+        ? h('a', { class: 'bouton neutre petit large', rel: 'noopener noreferrer', href: F.lienWhatsApp(wa, 'Bonjour, quel est le prix du n° ' + a.numero + ' ?') }, [icone('whatsapp'), 'Demander le prix'])
+        : h('span', { class: 'prix-boutique' }, ['Prix en boutique'])]);
+    } else if (!fini && q === 0) {
       compteur = h('div', { class: 'compteur' }, [
         h('button', { class: 'pas plus large' + (plein ? ' plein' : ''), 'aria-label': 'Ajouter le ' + a.numero, onclick: function () { changer(a.numero, 1); } }, [icone('plus')]),
       ]);
@@ -1098,7 +1337,7 @@ return toQR;
       compteur = h('div', { class: 'compteur' }, [
         h('button', { class: 'pas moins', 'aria-label': 'Un de moins', onclick: function () { changer(a.numero, -1); } }, [icone('moins')]),
         h('span', { class: 'qte' + (q >= 100 ? ' tres-long' : q >= 10 ? ' long' : ''), 'aria-live': 'polite' }, [String(q)]),
-        h('button', { class: 'pas plus', 'aria-label': 'Un de plus', disabled: q >= F.BORNES.quantite, onclick: function () { changer(a.numero, 1); } }, [icone('plus')]),
+        h('button', { class: 'pas plus', 'aria-label': 'Un de plus', disabled: q >= maxDe(a.numero), onclick: function () { changer(a.numero, 1); } }, [icone('plus')]),
       ]);
     }
     var p = photoDe(a);
@@ -1107,7 +1346,7 @@ return toQR;
       h('div', { class: classePlaque }, [
         p !== null && p.etat !== 'echec' ? p.img : null,
         h('span', { class: 'numero' + (a.numero >= 10000 ? ' tres-long' : a.numero >= 1000 ? ' long' : '') }, [h('span', { class: 'no' }, ['n°']), String(a.numero)]),
-        h('span', { class: 'etiquette ' + a.niveau }, [icone(etiquettes[a.niveau][0]), etiquettes[a.niveau][1]]),
+        h('span', { class: 'etiquette ' + a.niveau }, [icone(etiquette[0]), etiquette[1]]),
       ]),
       h('div', { class: 'corps' }, [
         a.prix > 0 ? h('div', { class: 'prix' }, [montant(a.prix)]) : h('div', { class: 'prix a-demander' }, ['Prix à demander']),
@@ -1118,7 +1357,7 @@ return toQR;
   }
   function majTuile(numero) {
     var ancienne = etat.tuiles[numero];
-    var a = etat.cat.articles.filter(function (x) { return x.numero === numero; })[0];
+    var a = articleDe(numero);
     if (!ancienne || !a) return;
     var nouvelle = tuile(a);
     ancienne.parentNode.replaceChild(nouvelle, ancienne);
@@ -1130,7 +1369,11 @@ return toQR;
     var resume = n
       ? h('div', { class: 'resume' }, [
         h('span', { class: 'rond-panier' }, [icone('panier'), h('span', { class: 'pastille-nombre' }, [String(n)])]),
-        h('span', { class: 'resume-texte' }, [h('span', { class: 'petit' }, [articles(n)]), h('span', { class: 'total' }, [montant(F.totalPanier(l))])]),
+        h('span', { class: 'resume-texte' }, [
+          h('span', { class: 'petit' }, [articles(n)]),
+          h('span', { class: 'total' }, [montant(F.totalPanier(l))]),
+          etat.ligne ? h('span', { class: 'petit' }, ['rien à payer ici']) : null,
+        ]),
       ])
       : h('div', { class: 'resume' }, [
         h('span', { class: 'rond-panier' }, [icone('plus')]),
@@ -1138,7 +1381,9 @@ return toQR;
       ]);
     return h('div', { class: 'barre' }, [h('div', { class: 'barre-dedans' }, [
       resume,
-      h('button', { class: 'bouton valider', disabled: !n, onclick: valider }, [icone('coche'), 'Valider']),
+      etat.ligne
+        ? h('button', { class: 'bouton valider', disabled: !n, onclick: commander }, [icone('panier'), 'Commander'])
+        : h('button', { class: 'bouton valider', disabled: !n, onclick: valider }, [icone('coche'), 'Valider']),
     ])]);
   }
   function majBarre() {
@@ -1148,8 +1393,10 @@ return toQR;
   }
   function texteVitrine() {
     var l = lignes();
-    var texte = sansCoche(etat.cat.boutique) + '. ' + etat.texteJour + 'Choisis tes articles avec le bouton plus, puis touche Valider.';
-    if (etat.repris) texte += ' Tu as déjà montré ce panier. Pour en faire un autre, touche Nouveau panier.';
+    var texte = sansCoche(etat.cat.boutique) + '. ' + etat.texteJour + (etat.ligne
+      ? 'Choisis tes articles avec le bouton plus, puis touche Commander. Rien à payer ici.'
+      : 'Choisis tes articles avec le bouton plus, puis touche Valider.');
+    if (etat.repris && !etat.ligne) texte += ' Tu as déjà montré ce panier. Pour en faire un autre, touche Nouveau panier.';
     if (l.length) texte += ' Ton panier : ' + articles(F.nombreArticles(l)) + ', ' + F.totalPanier(l) + ' francs.';
     return texte + ' ' + GARDE + ' ' + information(etat.cat);
   }
@@ -1167,7 +1414,9 @@ return toQR;
   }
 
   function vueVitrine() {
+    if (etat.ligne) { vueVitrineEnLigne(); return; }
     var cat = etat.cat;
+    arreterSuivi();
     etat.vue = 'vitrine';
     etat.tuiles = {};
     var nom = sansCoche(cat.boutique) || 'Vitrine';
@@ -1188,17 +1437,20 @@ return toQR;
       h('div', { class: 'rang' }, [icone('etiquette'), 'Le prix final se discute avec le vendeur.']),
     ]));
     if (etat.repris && lignes().length) app.appendChild(bandeauRepris());
+    app.appendChild(grilleDesArticles());
+    app.appendChild(piedDePage(cat));
+    etat.barre = barre();
+    app.appendChild(etat.barre);
+  }
+  function grilleDesArticles() {
     var grille = h('div', { class: 'grille' });
-    cat.articles.forEach(function (a) {
+    etat.cat.articles.forEach(function (a) {
       var t = tuile(a);
       etat.tuiles[a.numero] = t;
       grille.appendChild(t);
     });
-    if (!cat.articles.length) grille.appendChild(h('p', { class: 'vide' }, ['Pas d’article pour le moment.']));
-    app.appendChild(grille);
-    app.appendChild(piedDePage(cat));
-    etat.barre = barre();
-    app.appendChild(etat.barre);
+    if (!etat.cat.articles.length) grille.appendChild(h('p', { class: 'vide' }, ['Pas d’article pour le moment.']));
+    return grille;
   }
 
   // ------------------------------------------------------------ le panier, à montrer ou à envoyer
@@ -1211,8 +1463,7 @@ return toQR;
     etat.panier.montre = empreinte(l);
     etat.repris = false;
     garder();
-    var d = etat.panier.demande;
-    try { window.localStorage.setItem(STOCKAGE + 'faits', JSON.stringify(faits().filter(function (x) { return x !== d; }).concat(d).slice(-50))); } catch (e) { /* rien */ }
+    noterFait(etat.panier.demande);
     etat.defile = window.pageYOffset || 0;
     try { history.pushState({ vitrine: 'panier' }, '', location.href); } catch (e) { /* rien */ }
     vuePanier();
@@ -1371,12 +1622,14 @@ return toQR;
   // ------------------------------------------------------------ erreurs
 
   function vueErreur(code) {
+    arreterSuivi();
     etat.vue = 'erreur';
     app.className = '';
     app.textContent = '';
     var textes = {
       pas_un_lien: ['code', 'Vitrine', 'Scanne le code de la boutique pour voir ses articles.'],
       version_inconnue: ['lien', 'Lien trop récent', 'Ce lien vient d’une version plus récente. Recharge la page.'],
+      suivi: ['lien', 'Ton panier', 'Ce suivi ne s’ouvre pas ici. Rouvre le lien de la boutique.'],
     };
     var t = textes[code] || ['lien', 'Ce lien est abîmé', 'Demande au vendeur de te renvoyer le lien de sa boutique.'];
     app.appendChild(entete('Vitrine', 'sac', null, t[1] + '. ' + t[2]));
@@ -1388,16 +1641,1484 @@ return toQR;
     app.appendChild(piedDePage(null));
   }
 
+  // ============================================================ la vitrine en ligne (D85)
+  //
+  // Le chemin se choisit à l'ouverture, une fois : un catalogue en version 3 porte le code de la
+  // vitrine ; la page demande au serveur (vitrine_voir) si la boutique reçoit. Réponse en 5 s, et
+  // elle reçoit : « Commander », puis « Envoyer à … ». Sinon le parcours d'aujourd'hui (« Valider »,
+  // le code, WhatsApp), sans un mot sur le serveur. Une réponse tardive ne change rien à la visite.
+  // Le contrat : docs/COMMANDE-DIRECTE-CONTRAT.md.
+
+  function fetcher(u, i) {
+    return window.fetch(u, i);
+  }
+  function aLeReseau() {
+    return navigator.onLine !== false;
+  }
+  function visible() {
+    return document.visibilityState !== 'hidden';
+  }
+  /** L'heure du serveur, d'après le dernier écart mesuré. */
+  function maintenantServeur() {
+    return Date.now() + (etat.envoi && etat.envoi.ecart ? etat.envoi.ecart : etat.ligne ? etat.ligne.ecart : 0);
+  }
+  function nomBoutique() {
+    var p = etat.envoi && etat.envoi.panier;
+    var nom = p && p.boutique && p.boutique.nom ? p.boutique.nom : etat.cat ? etat.cat.boutique : '';
+    return sansCoche(F.nettoyerTexte(String(nom || ''), F.BORNES.nomBoutique));
+  }
+  function whatsappBoutique() {
+    var p = etat.envoi && etat.envoi.panier;
+    if (p && p.boutique) return Res.numeroWhatsApp(p.boutique.whatsapp);
+    return etat.ligne && etat.cat ? etat.cat.whatsapp : null;
+  }
+  function majuscule(t) {
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+  /** Le nom d'un article dans une phrase : « Il ne reste que 1 savon. » */
+  function nomDans(x) {
+    var nom = sansCoche(String(x.nom || ''));
+    if (!nom) return 'article n° ' + x.numero;
+    return /^.[a-zà-ÿ]/.test(nom) ? nom.charAt(0).toLowerCase() + nom.slice(1) : nom;
+  }
+
+  // ------------------------------------------------------------ ce que le navigateur garde (§ 9 du contrat)
+
+  /** Le client : son prénom et son numéro, 30 jours au plus, avec « Oublier ». */
+  function lireClient() {
+    var c = lire(STOCKAGE + 'client');
+    var t = Date.now();
+    if (!c || typeof c !== 'object' || typeof c.jusqua !== 'number' || c.jusqua <= t || typeof c.le !== 'number' || c.le > t + 60000) return null;
+    if (typeof c.telephone !== 'string' || !/^[1-9][0-9]{7,14}$/.test(c.telephone)) return null;
+    return {
+      prenom: typeof c.prenom === 'string' ? F.nettoyerTexte(c.prenom, B.prenom) : '',
+      telephone: c.telephone,
+      pays: typeof c.pays === 'string' && N.estCode && N.estCode(c.pays) ? c.pays : null,
+    };
+  }
+  function garderClient(prenom, telephone, pays) {
+    var t = Date.now();
+    ecrire(STOCKAGE + 'client', { prenom: prenom, telephone: telephone, pays: pays, le: t, jusqua: t + B.souvenirClientMs });
+  }
+
+  /**
+   * L'envoi en cours pour cette vitrine : l'identifiant et le jeton tirés AVANT tout appel, les lignes,
+   * l'état (« pret » : montré, pas encore envoyé ; « envoi » ; « secours » : deux échecs ; « envoye »)
+   * et ce que le serveur en a dit. Oublié à la fin du panier ; jamais gardé plus de 3 jours.
+   */
+  function lireEnvoi(code) {
+    var e = lire(STOCKAGE + 'envoi.' + code);
+    var t = Date.now();
+    if (!e || typeof e !== 'object' || e.code !== code || typeof e.demande !== 'string' || !/^[0-9a-f]{8}$/.test(e.demande) ||
+      typeof e.jeton !== 'string' || !/^[0-9a-f]{64}$/.test(e.jeton) || ['pret', 'envoi', 'secours', 'envoye'].indexOf(e.etat) < 0 ||
+      !Array.isArray(e.lignes) || typeof e.t !== 'number' || t - e.t > DUREE_ENVOI || e.t > t + 60000) return null;
+    e.lignes = e.lignes.filter(function (x) {
+      return x && Number.isInteger(x.numero) && x.numero >= 1 && x.numero <= F.BORNES.numero && Number.isInteger(x.quantite) &&
+        x.quantite >= 1 && x.quantite <= B.quantite && Number.isInteger(x.prixVu) && x.prixVu >= 0;
+    }).slice(0, B.lignes);
+    if (e.etat !== 'envoye' && !e.lignes.length) return null;
+    return e;
+  }
+  function garderEnvoi(e) {
+    ecrire(STOCKAGE + 'envoi.' + e.code, e);
+  }
+  function oublierEnvoi(e) {
+    effacer(STOCKAGE + 'envoi.' + e.code);
+  }
+
+  /** Les 3 derniers paniers finis de cette boutique : leurs lignes seulement, 30 jours, avec « Oublier ». */
+  function cleDerniers(cle) {
+    return STOCKAGE + 'derniers.' + hexa8(cle);
+  }
+  function lireDerniers(cle) {
+    var d = lire(cleDerniers(cle));
+    var t = Date.now();
+    if (!Array.isArray(d)) return [];
+    return d.filter(function (x) {
+      return x && typeof x.le === 'number' && t - x.le < B.souvenirClientMs && x.le <= t + 60000 && Array.isArray(x.lignes) && x.lignes.length > 0;
+    }).slice(0, B.derniersPaniersGardes);
+  }
+  /** Un panier servi depuis moins de 30 minutes : encore suivi (une vente défaite le rend). */
+  function suiviApresServi(e) {
+    var p = e && e.panier;
+    return !!p && p.etat === 'vendu' && typeof p.fini_le === 'number' && Date.now() + (e.ecart || 0) - p.fini_le < SUIVI_APRES_SERVI;
+  }
+  /** Un panier servi qui revient (la vente défaite) : il quitte les derniers paniers. */
+  function retirerDernier(p) {
+    if (!p || !p.boutique) return;
+    var d = lireDerniers(p.boutique.cle);
+    var reste = d.filter(function (x) { return x.numero !== p.numero || x.cree !== p.cree_le; });
+    if (reste.length !== d.length) ecrire(cleDerniers(p.boutique.cle), reste);
+  }
+  function rangerDernier(e) {
+    var p = e.panier;
+    if (!p || !p.boutique) return;
+    // Les lignes seulement (et de quoi dire « servi le 20 oct. ») : ni identifiant, ni jeton, ni numéro de téléphone.
+    var d = lireDerniers(p.boutique.cle).filter(function (x) { return x.numero !== p.numero || x.cree !== p.cree_le; });
+    d.unshift({
+      numero: p.numero, cree: p.cree_le, etat: p.etat, motif: p.motif, fini: p.fini_le || Date.now(), le: Date.now(),
+      lignes: p.lignes.slice(0, B.lignes).map(function (l) {
+        return { numero: l.numero, quantite: l.quantite, nom: String(l.nom || '').slice(0, 24), prix: l.prix_unitaire, fin: l.fin };
+      }),
+    });
+    ecrire(cleDerniers(p.boutique.cle), d.slice(0, B.derniersPaniersGardes));
+  }
+
+  // ------------------------------------------------------------ choisir le chemin
+
+  /** Le serveur d'un catalogue en version 3 : celui qu'il porte, s'il est permis, avec la clé publique. */
+  function serveurDuCatalogue(cat) {
+    if (!Res || !cat.enLigne || !cat.photos) return null;
+    var url = F.urlDuServeur(cat.photos.serveur);
+    return url === null ? null : Res.serveurEnLigne(url);
+  }
+  function enLignePossible() {
+    return !!Res && typeof window.fetch === 'function' && Res.peutTirer();
+  }
+
+  /** Vrai le temps d'aller à la vitrine depuis le suivi (« Voir la vitrine », « Refaire ») : le suivi ne repasse pas devant. */
+  var versLaVitrine = false;
+
+  function choisirChemin(cat) {
+    var voulu = versLaVitrine;
+    versLaVitrine = false;
+    var serveur = serveurDuCatalogue(cat);
+    if (serveur === null || !enLignePossible()) { vitrineSansServeur(); return; }
+    etat.serveur = serveur;
+    etat.code = cat.enLigne.code;
+    etat.origine = cat.enLigne.origine;
+    ecrire(STOCKAGE + 'catalogue.' + etat.code, { c: etat.contenu, le: Date.now() });
+    restreindreImages(serveur.url, true);
+    if (etat.retourChrome) adopterRetourChrome();
+    // Un panier envoyé et pas fini : son suivi d'abord, « Voir la vitrine » en bas.
+    var suivis = lireSuivis(etat.code).filter(function (x) { return !x.panier || !Res.estFini(x.panier.etat); });
+    if (suivis.length && !voulu) { etat.envoi = suivis[0]; vueSuivi(); relire(); return; }
+    if (!aLeReseau()) { vitrineSansServeur(); return; }
+    vueAttente();
+    Res.voir(fetcher, serveur, etat.code, null).then(function (r) {
+      if (etat.vue !== 'attente') return;
+      if (!recevoirVue(r)) { vitrineSansServeur(); return; }
+      if (etat.refaire) { appliquerRefaire(); return; }
+      var envoi = lireEnvoi(etat.code);
+      if (envoi && envoi.etat === 'envoi') {
+        // Parti pendant l'envoi : la page reprend l'état « en cours » (le même identifiant, le même jeton) et le dit.
+        etat.envoi = envoi;
+        etat.repriseEnvoi = true;
+        parler('Ton panier était en cours d’envoi. On continue.');
+        essayer(1);
+        return;
+      }
+      if (envoi && envoi.etat === 'secours') {
+        // Deux échecs, ou rouvert dans Chrome : le secours, sans nouvel essai tout seul.
+        etat.envoi = envoi;
+        etat.cause = 'serveur';
+        vueTonPanier();
+        return;
+      }
+      vueVitrineEnLigne();
+    }, function () {
+      if (etat.vue === 'attente') vitrineSansServeur();
+    });
+  }
+
+  /** La réponse de vitrine_voir : la vitrine qui reçoit, ses articles et leurs prix, ceux du serveur. */
+  function recevoirVue(r) {
+    if (!r || r.ok !== true || r.inchange !== false || !r.vitrine || typeof r.vitrine !== 'object' || !Array.isArray(r.articles)) return false;
+    var v = r.vitrine;
+    if (!Number.isInteger(v.cle) || v.cle < 0 || v.cle > 0xffffffff) return false;
+    var vus = {};
+    var articlesEnLigne = [];
+    r.articles.slice(0, F.BORNES.articles).forEach(function (a) {
+      if (!a || !Number.isInteger(a.numero) || a.numero < 1 || a.numero > F.BORNES.numero || vus[a.numero]) return;
+      if (!Number.isInteger(a.prix) || a.prix < 0 || a.prix > B.totalMax) return;
+      if (['epuise', 'bientot_fini', 'disponible'].indexOf(a.niveau) < 0) return;
+      vus[a.numero] = true;
+      var x = { numero: a.numero, nom: F.nettoyerTexte(String(a.nom || ''), F.BORNES.nomArticle), prix: a.prix, niveau: a.niveau };
+      if (Number.isInteger(a.reste) && a.reste >= 1 && a.reste <= 3) x.reste = a.reste;
+      if (typeof a.photo === 'string') x.photoNom = a.photo;
+      articlesEnLigne.push(x);
+    });
+    etat.ligne = {
+      ecart: typeof r.maintenant === 'number' ? r.maintenant - Date.now() : 0,
+      etiquette: r.etiquette,
+      prixLe: typeof v.prix_le === 'number' ? v.prix_le : null,
+      servis: Number.isInteger(v.paniers_servis) && v.paniers_servis >= B.servisMontresDes ? v.paniers_servis : null,
+      servisDepuis: typeof v.servis_depuis === 'string' ? v.servis_depuis : null,
+    };
+    // Le nom et le WhatsApp viennent du serveur, jamais de l'adresse : un lien fabriqué avec le vrai
+    // code et le numéro d'un escroc n'envoie personne chez l'escroc.
+    etat.catLien = etat.cat;
+    etat.cat = {
+      cle: v.cle, jour: aujourdhui(), boutique: F.nettoyerTexte(String(v.nom || ''), F.BORNES.nomBoutique),
+      whatsapp: Res.numeroWhatsApp(v.whatsapp), articles: articlesEnLigne, photos: null,
+    };
+    etat.panier = chargerPanier();
+    return true;
+  }
+
+  function vueAttente() {
+    etat.vue = 'attente';
+    app.className = '';
+    app.textContent = '';
+    var nom = sansCoche(etat.cat.boutique) || 'Vitrine';
+    document.title = nom;
+    app.appendChild(entete(nom, 'sac', null, nom + '. Un instant.'));
+    app.appendChild(h('div', { class: 'attente' }, [h('span', { class: 'anneau', 'aria-hidden': 'true' }), 'Un instant…']));
+  }
+
+  /** Rouvert dans Chrome par le lien du secours : le panier et son jeton sont rangés, pas gardés dans l'adresse. */
+  function adopterRetourChrome() {
+    var rc = etat.retourChrome;
+    etat.retourChrome = null;
+    var lu;
+    try { lu = F.lireAdresse('#p=' + rc.p); } catch (e) { return; }
+    if (lu.type !== 'panier' || lu.panier.cle !== etat.cat.cle) return;
+    var deja = lireEnvoi(etat.code);
+    if (deja && deja.jeton === rc.j) return;
+    var noms = {};
+    etat.cat.articles.forEach(function (a) { noms[a.numero] = a.nom; });
+    garderEnvoi({
+      code: etat.code, cle: etat.cat.cle, demande: lu.panier.demande, jeton: rc.j, etat: 'secours', t: Date.now(), panier: null,
+      lignes: lu.panier.lignes.filter(function (x) { return x.quantite <= B.quantite; }).map(function (x) {
+        return { numero: x.numero, quantite: x.quantite, prixVu: x.prixVu, nom: noms[x.numero] || '' };
+      }),
+    });
+  }
+
+  // ------------------------------------------------------------ la vitrine en ligne
+
+  function texteServis() {
+    var L = etat.ligne;
+    if (L.servis === null) return '';
+    var mois = Res.moisDepuis(L.servisDepuis, maintenantServeur());
+    return L.servis + ' paniers servis' + (mois ? ' depuis ' + mois : '');
+  }
+  /** « Prix de 9 h 30 », « Prix d'hier, 18 h 10 », ou plus vieux, en orange. */
+  function textePrix() {
+    var L = etat.ligne;
+    if (L.prixLe === null) return { texte: '', vieux: false };
+    var j = Res.joursEntre(L.prixLe, maintenantServeur());
+    if (j <= 0) return { texte: 'Prix de ' + Res.heure(L.prixLe), vieux: false };
+    if (j === 1) return { texte: 'Prix d’hier, ' + Res.heure(L.prixLe), vieux: false };
+    return { texte: 'Prix du ' + Res.date(L.prixLe) + ' : ils ont pu changer', vieux: true };
+  }
+
+  function vueVitrineEnLigne() {
+    var cat = etat.cat;
+    arreterSuivi();
+    etat.vue = 'vitrine';
+    etat.tuiles = {};
+    etat.envoi = null;
+    etat.changements = [];
+    etat.refusLignes = {};
+    etat.dejaVendu = false;
+    var nom = sansCoche(cat.boutique) || 'Vitrine';
+    document.title = nom;
+    app.className = 'avec-barre';
+    app.textContent = '';
+    var servis = texteServis();
+    var prix = textePrix();
+    etat.texteJour = (servis ? servis + '. ' : '') + (prix.texte ? prix.texte + '. ' : '');
+    app.appendChild(entete(nom, 'sac', null, texteVitrine));
+    var derniers = lireDerniers(cat.cle);
+    if (derniers.length) app.appendChild(carteDernier(derniers[0]));
+    // Sans bandeau devant les articles : une seule ligne, et seulement ce qui est vrai.
+    if (servis || prix.texte) {
+      app.appendChild(h('div', { class: 'bandeau' + (prix.vieux ? ' vieux' : '') }, [
+        servis ? h('div', { class: 'rang' }, [icone('panier'), servis]) : null,
+        prix.texte ? h('div', { class: 'rang' }, [icone('horloge'), prix.texte]) : null,
+      ]));
+    }
+    app.appendChild(grilleDesArticles());
+    app.appendChild(piedEnLigne());
+    etat.barre = barre();
+    app.appendChild(etat.barre);
+  }
+
+  /** Le petit texte du bas, sans bandeau d'alerte : l'avertissement en gris, « Signaler cette boutique ». */
+  function piedEnLigne() {
+    var nom = nomBoutique();
+    var wa = whatsappBoutique();
+    var tel = R.TELEPHONE_EDITEUR && R.TELEPHONE_EDITEUR.charAt(0) === '+' ? R.TELEPHONE_EDITEUR.replace(/\D/g, '') : '';
+    var signaler = tel.length >= 8
+      ? F.lienWhatsApp(tel, 'Bonjour, je signale la boutique « ' + nom + ' » (vitrine ' + etat.code + ').')
+      : R.PAGE_DONNEES;
+    return h('div', {}, [
+      h('p', { class: 'pied-garde' }, [GARDE + ' ', h('a', { href: signaler, rel: 'noopener noreferrer' }, ['Signaler cette boutique'])]),
+      wa ? h('p', { class: 'pied-page' }, ['Numéro de la boutique : ' + numeroBoutique(wa) + '.']) : null,
+      h('p', { class: 'pied-info' }, [R.informationVitrine(nom, wa ? F.formaterWhatsApp(wa) : '', true) + ' ', h('a', { href: R.PAGE_DONNEES }, ['Tes données'])]),
+    ]);
+  }
+
+  function motFin(d) {
+    if (d.etat === 'vendu') return 'servi le ';
+    if (d.etat === 'refuse') return 'refusé le ';
+    if (d.etat === 'expire') return 'sans réponse le ';
+    return 'annulé le ';
+  }
+  /** « Ton dernier panier : servi le 20 oct. », ses photos, et « Refaire ce panier ». */
+  function carteDernier(d) {
+    var photos = {};
+    etat.cat.articles.forEach(function (a) { photos[a.numero] = a.photoNom; });
+    return h('div', { class: 'carte dernier' }, [
+      h('div', { class: 'rang-titre' }, [icone('panier'), 'Ton dernier panier : ' + motFin(d) + Res.date(d.fini)]),
+      h('div', { class: 'rang-dernier' }, [
+        h('span', { class: 'vignettes' }, d.lignes.slice(0, 3).map(function (l) { return vignette(l.numero, l.quantite, photos[l.numero]); })),
+        h('button', { class: 'bouton valider', onclick: function () { refaire(d.lignes, []); } }, [icone('recommencer'), 'Refaire ce panier']),
+      ]),
+      h('button', { class: 'lien-discret', onclick: function () { effacer(cleDerniers(etat.cat.cle)); vueVitrineEnLigne(); } }, ['Oublier mes derniers paniers']),
+    ]);
+  }
+
+  /**
+   * « Refaire ce panier » : les mêmes articles, aux prix et au stock du jour ; ce qui a changé est dit
+   * en orange sur « Ton panier ». `sauf` : les numéros à laisser (refusés : il n'y en avait plus).
+   */
+  function refaire(lignesAvant, sauf) {
+    etat.refaire = { lignes: lignesAvant, sauf: sauf || [] };
+    if (etat.ligne && etat.vue === 'vitrine') { appliquerRefaire(); return; }
+    revenirALaVitrine();
+  }
+  function appliquerRefaire() {
+    var r = etat.refaire;
+    etat.refaire = null;
+    etat.panier = nouveauPanier();
+    etat.changements = [];
+    r.lignes.forEach(function (l) {
+      if (r.sauf.indexOf(l.numero) >= 0) return;
+      var a = articleDe(l.numero);
+      var nom = nomDans({ numero: l.numero, nom: a ? a.nom : l.nom });
+      if (!a || a.niveau === 'epuise' || (etat.ligne && a.prix === 0)) { etat.changements.push('Plus ' + Res.de(nom) + '.'); return; }
+      var q = Math.min(l.quantite, maxDe(l.numero));
+      if (q < l.quantite) etat.changements.push('Il ne reste que ' + q + ' ' + nom + '.');
+      if (l.prix && l.prix !== a.prix) etat.changements.push(majuscule(nom) + ' est passé à ' + F.formaterNombre(a.prix) + ' F.');
+      etat.panier.q[l.numero] = q;
+    });
+    garder();
+    if (!etat.ligne) { vueVitrine(); return; }
+    if (!lignes().length) {
+      var dits = etat.changements.join(' ');
+      vueVitrineEnLigne();
+      parler(dits);
+      return;
+    }
+    commander();
+  }
+  /** Retour à la vitrine : le lien de la boutique, ou (suivi ouvert d'ailleurs) celui gardé pour ce code. */
+  function revenirALaVitrine() {
+    arreterSuivi();
+    var gardee = etat.code ? lire(STOCKAGE + 'catalogue.' + etat.code) : null;
+    var contenu = etat.contenu || (gardee && typeof gardee.c === 'string' ? gardee.c : '');
+    if (!contenu) { vueErreur('suivi'); return; }
+    versLaVitrine = true;
+    try { history.pushState(null, '', adressePage() + '#c=' + contenu); } catch (e) { /* rien */ }
+    demarrer();
+  }
+  /** Le parcours d'aujourd'hui ; un « Refaire » demandé s'y applique aussi (aux prix du catalogue). */
+  function vitrineSansServeur() {
+    if (etat.refaire) appliquerRefaire();
+    else vueVitrine();
+  }
+
+  // ------------------------------------------------------------ « Ton panier » (en ligne)
+
+  /** Les lignes telles qu'elles partent : nom et photo pour la page, prix vus pour le QR et WhatsApp. */
+  function lignesEnvoi() {
+    return lignes().map(function (x) {
+      var a = articleDe(x.numero);
+      return { numero: x.numero, quantite: x.quantite, prixVu: x.prixVu, nom: a ? a.nom : '', photo: a && a.photoNom ? a.photoNom : null };
+    });
+  }
+  function totalDe(l) {
+    return l.reduce(function (s, x) { return s + x.quantite * x.prixVu; }, 0);
+  }
+  /**
+   * L'identifiant et le jeton : tirés AVANT tout appel, gardés avec les lignes. Les mêmes lignes
+   * gardent la même paire ; d'autres lignes en tirent une nouvelle (et l'ancienne, peut-être arrivée
+   * au serveur sans réponse, est annulée sans attendre : pas de panier fantôme).
+   */
+  function preparerEnvoi() {
+    var l = lignesEnvoi();
+    // Un envoi encore en route (le client est revenu à la vitrine pendant ce temps) : le même.
+    var enVol = etat.envoiEnVol;
+    if (enVol && enVol.code === etat.code && empreinte(enVol.lignes) === empreinte(l)) return enVol;
+    var e = lireEnvoi(etat.code);
+    if (e && e.etat !== 'envoye' && empreinte(e.lignes) === empreinte(l)) {
+      e.lignes = l;
+      // Parti sans réponse : la même paire repart au prochain « Envoyer » (le serveur ne la compte pas deux fois).
+      if (e.etat === 'envoi') e.etat = 'pret';
+      return e;
+    }
+    if (e && (e.etat === 'envoi' || e.etat === 'secours')) annulerPlusTard(e.jeton);
+    var paire = Res.tirerPaire();
+    etat.panier.demande = paire.demande;
+    etat.panier.montre = empreinte(l);
+    garder();
+    noterFait(paire.demande);
+    e = { code: etat.code, cle: etat.cat.cle, demande: paire.demande, jeton: paire.jeton, etat: 'pret', t: Date.now(), lignes: l, panier: null };
+    garderEnvoi(e);
+    return e;
+  }
+  /**
+   * Les paniers peut-être arrivés au serveur sans réponse, puis remplacés (d'autres lignes) ou
+   * abandonnés : leur annulation repart à chaque occasion (un envoi, le retour du réseau, l'ouverture
+   * de la page) jusqu'à ce que le serveur l'ait prise (annulé, inconnu, ou déjà en main à la
+   * boutique). Sinon un panier fantôme restait au comptoir : il sonnait, réservait ses articles, et le
+   * client ne pouvait plus ni le voir ni l'annuler. Gardés 3 jours au plus, 10 au plus.
+   */
+  var CLE_A_ANNULER = STOCKAGE + 'a_annuler';
+  function aAnnuler() {
+    var l = lire(CLE_A_ANNULER);
+    var t = Date.now();
+    if (!Array.isArray(l)) return [];
+    return l.filter(function (x) {
+      return x && typeof x.jeton === 'string' && /^[0-9a-f]{64}$/.test(x.jeton) && typeof x.t === 'number' && t - x.t <= DUREE_ENVOI &&
+        x.serveur && typeof x.serveur.url === 'string' && typeof x.serveur.cle === 'string';
+    }).slice(-10);
+  }
+  function annulerPlusTard(jeton) {
+    if (!etat.serveur) return;
+    var l = aAnnuler().filter(function (x) { return x.jeton !== jeton; });
+    l.push({ jeton: jeton, serveur: etat.serveur, t: Date.now() });
+    ecrire(CLE_A_ANNULER, l.slice(-10));
+    annulerEnAttente();
+  }
+  var annulationEnCours = null;
+  /** Rejoue les annulations en attente ; rend une promesse (jamais rejetée) quand c'est fait. */
+  function annulerEnAttente() {
+    if (annulationEnCours) return annulationEnCours;
+    var l = aAnnuler();
+    if (!l.length || !aLeReseau()) return Promise.resolve();
+    var restants = [];
+    var suite = Promise.resolve();
+    l.forEach(function (x) {
+      suite = suite.then(function () {
+        return Res.annulerMonPanier(fetcher, x.serveur, x.jeton).then(function (r) {
+          // Annulé, inconnu, ou déjà en main à la boutique (« pris ») : le serveur l'a. Sinon, plus tard.
+          if (!(r && (r.ok === true || r.refus === 'panier_inconnu' || r.refus === 'pris'))) restants.push(x);
+        }, function () { restants.push(x); });
+      });
+    });
+    annulationEnCours = suite.then(function () {
+      annulationEnCours = null;
+      // Ce qui s'est ajouté pendant ce temps reste aussi.
+      var ajoutes = aAnnuler().filter(function (x) { return !l.some(function (y) { return y.jeton === x.jeton; }); });
+      var tous = restants.concat(ajoutes);
+      if (tous.length) ecrire(CLE_A_ANNULER, tous);
+      else effacer(CLE_A_ANNULER);
+    });
+    return annulationEnCours;
+  }
+
+  /** Une autre paire pour le même panier (« demande_prise ») : le QR se redessine avec elle. */
+  function nouvellePaire(e) {
+    var paire = Res.tirerPaire();
+    e.demande = paire.demande;
+    e.jeton = paire.jeton;
+    etat.panier.demande = paire.demande;
+    garder();
+    noterFait(paire.demande);
+    garderEnvoi(e);
+  }
+
+  function commander() {
+    if (!lignes().length) return;
+    etat.envoi = preparerEnvoi();
+    etat.refusLignes = {};
+    etat.erreurChamp = null;
+    etat.cause = '';
+    etat.defile = window.pageYOffset || 0;
+    try { history.pushState({ vitrine: 'panier' }, '', location.href); } catch (e) { /* rien */ }
+    vueTonPanier();
+  }
+  function lienDuPanier(e, prenom) {
+    var octets = F.encoderPanier({
+      cle: etat.cat.cle, demande: e.demande, prenom: prenom,
+      lignes: e.lignes.map(function (x) { return { numero: x.numero, quantite: x.quantite, prixVu: x.prixVu }; }),
+    });
+    return F.versBase64url(octets);
+  }
+  /** Le nombre de signes d'un texte (un emoji compte pour un). */
+  function signes(t) {
+    return String(t).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '_').length;
+  }
+  /** « Envoyer à Chez Mariam » (le nom vient du serveur) ; au-delà de 14 signes, « Envoyer à la boutique ». */
+  function libelleEnvoyer() {
+    var nom = nomBoutique();
+    return nom && signes(nom) <= 14 ? 'Envoyer à ' + nom : 'Envoyer à la boutique';
+  }
+  /** « Prix de la boutique à 9 h 30. Elle te confirme le total. » : dit une fois, en positif. */
+  function notePrix() {
+    var L = etat.ligne;
+    if (!L || L.prixLe === null) return 'Prix de la boutique. Elle te confirme le total.';
+    var j = Res.joursEntre(L.prixLe, maintenantServeur());
+    var quand = j <= 0 ? 'à ' + Res.heure(L.prixLe) : j === 1 ? 'd’hier, ' + Res.heure(L.prixLe) : 'du ' + Res.date(L.prixLe) + ' : ils ont pu changer';
+    return 'Prix de la boutique ' + quand + '. Elle te confirme le total.';
+  }
+  function texteSecours() {
+    var cause = etat.cause === 'reseau' ? 'Pas de réseau sur ton téléphone.' : 'L’envoi direct ne marche pas pour le moment.';
+    if (!whatsappBoutique()) return cause + ' Montre ce code au vendeur.';
+    return cause + (etat.origine === 'lien' ? ' Envoie ton panier sur WhatsApp, ou montre ce code.' : ' Montre ce code au vendeur, ou envoie-le sur WhatsApp.');
+  }
+
+  function vueTonPanier() {
+    var e = etat.envoi;
+    var cat = etat.cat;
+    arreterSuivi();
+    etat.vue = 'ton-panier';
+    app.className = '';
+    app.textContent = '';
+    window.scrollTo(0, 0);
+    var l = e.lignes;
+    var total = totalDe(l);
+    var n = F.nombreArticles(l);
+    var nom = nomBoutique();
+    var client = etat.changerClient ? null : lireClient();
+    var secours = e.etat === 'secours';
+    var prenom = F.prenomLisible(e.prenom !== undefined ? e.prenom : client ? client.prenom : '');
+    var contenuPanier = lienDuPanier(e, prenom);
+    var lien = adressePage() + '#p=' + contenuPanier;
+    var wa = whatsappBoutique();
+    var lienWa = wa ? F.lienWhatsApp(wa, F.texteWhatsApp(cat, l, prenom, lien)) : null;
+    var refus = Object.keys(etat.refusLignes);
+    // Au secours depuis le carré imprimé (ou sans WhatsApp), le client est sans doute au comptoir : le code d'abord.
+    var codeDAbord = etat.origine !== 'lien' || !lienWa;
+
+    app.appendChild(entete('Ton panier', 'panier', retourVitrine, function () { return texteTonPanier(e, client, secours); }));
+
+    // Ce qui ne va pas, en haut : le secours, une ligne refusée, un prix qui a changé.
+    if (secours) {
+      app.appendChild(h('div', { class: 'bandeau vieux' }, [h('div', { class: 'rang' }, [icone(etat.cause === 'reseau' ? 'nuageBarre' : 'alerte'), texteSecours()])]));
+    } else if (refus.length) {
+      app.appendChild(h('div', { class: 'bandeau vieux' }, [h('div', { class: 'rang' }, [icone('alerte'), etat.refusLignes[refus[0]].phrase])]));
+    } else if (etat.changements.length) {
+      app.appendChild(h('div', { class: 'bandeau vieux' }, etat.changements.map(function (t) { return h('div', { class: 'rang' }, [icone('alerte'), t]); })));
+    }
+    if (etat.dejaVendu) {
+      app.appendChild(h('div', { class: 'bandeau vieux' }, [
+        h('div', { class: 'rang' }, [icone('alerte'), 'La boutique a déjà servi ce panier.']),
+        h('button', { class: 'bouton neutre large espace', onclick: function () { etat.dejaVendu = false; nouvellePaire(e); e.etat = 'pret'; garderEnvoi(e); vueTonPanier(); } }, [icone('recommencer'), 'Refaire ce panier']),
+      ]));
+    }
+
+    if (secours && codeDAbord) {
+      app.appendChild(h('div', { class: 'carte' }, [h('div', { class: 'titre-carte' }, [icone('telephone'), 'Montre ce code au vendeur']), dessinQrSur(lien)]));
+    }
+
+    // Les lignes : la photo, la quantité, le prix ; une ligne refusée, en orange, avec ce qu'on peut faire.
+    app.appendChild(h('div', { class: 'carte' }, l.map(function (x) { return rangeeLigne(x); }).concat([
+      h('div', { class: 'total-panier' }, [h('span', { class: 'combien' }, [articles(n)]), h('span', { class: 'montant' }, [montant(total)])]),
+      secours ? null : h('p', { class: 'note' }, [icone('horloge', 'petite'), notePrix()]),
+    ])));
+
+    if (secours) {
+      // Rouvert dans Chrome par le lien du secours : le numéro n'y est pas encore.
+      if (!client && !e.telephone) app.appendChild(blocClient(e, client, nom));
+      app.appendChild(blocSecours(e, lien, lienWa, codeDAbord));
+      app.appendChild(piedEnLigne());
+      return;
+    }
+
+    app.appendChild(blocClient(e, client, nom));
+    app.appendChild(h('div', { class: 'carte et-apres' }, [
+      h('div', { class: 'titre-petit' }, ['Et après']),
+      h('div', { class: 'etapes-apres' }, [
+        etapeApres('boutique', 'Elle reçoit'), icone('fleche', 'fleche-petite'),
+        etapeApres('appel', 'Elle confirme ou t’appelle'), icone('fleche', 'fleche-petite'),
+        etapeApres('mainPiece', 'Tu paies et prends à la boutique'),
+      ]),
+    ]));
+    app.appendChild(h('p', { class: 'argent' }, [icone('billets'), ARGENT]));
+
+    var enCours = e.etat === 'envoi';
+    app.appendChild(h('div', { class: 'zone-envoi' }, [
+      h('button', {
+        class: 'bouton valider large geant' + (enCours ? ' en-cours' : ''), 'aria-busy': enCours ? 'true' : null,
+        onclick: function () { envoyer(); },
+      }, enCours ? [h('span', { class: 'anneau', 'aria-hidden': 'true' }), 'Envoi…'] : [icone('envoyer'), libelleEnvoyer()]),
+      enCours && etat.repriseEnvoi ? h('p', { class: 'note centre' }, ['Ton panier était en cours d’envoi. On continue.']) : null,
+      enCours && etat.lent ? h('p', { class: 'note centre' }, ['Réseau lent, on continue. Ne ferme pas.']) : null,
+    ]));
+    app.appendChild(h('div', { class: 'carte petit-code' }, [
+      h('div', { class: 'titre-carte petit' }, [icone('code'), 'ou montre ce code au vendeur']),
+      dessinQrSur(lien),
+    ]));
+    app.appendChild(piedEnLigne());
+  }
+
+  function etapeApres(dessin, texte) {
+    return h('span', { class: 'etape-apres' }, [h('span', { class: 'rond-etape' }, [icone(dessin)]), texte]);
+  }
+
+  /** Une ligne de « Ton panier ». Refusée par le serveur : en orange, la phrase, et les boutons qui renvoient. */
+  function rangeeLigne(x) {
+    var r = etat.refusLignes[x.numero];
+    var nom = sansCoche(x.nom || '') || 'Article n° ' + x.numero;
+    var ligne = h('div', { class: 'ligne' + (r ? ' en-cause' : '') }, [
+      vignette(x.numero, x.quantite, x.photo),
+      h('span', { class: 'ligne-nom' }, [nom]),
+      h('span', { class: 'ligne-prix' }, [montant(x.prixVu * x.quantite)]),
+    ]);
+    if (!r) return ligne;
+    var etiquette = 'le n° ' + x.numero;
+    var boutons = [];
+    if (r.genre === 'reste') {
+      boutons.push(h('button', { class: 'bouton valider', onclick: function () { changerLigne(x.numero, r.reste, true); } }, [icone('envoyer'), 'Envoyer avec ' + r.reste]));
+      boutons.push(h('button', { class: 'bouton neutre', onclick: function () { changerLigne(x.numero, 0, false); } }, [icone('croix'), 'Enlever ' + etiquette]));
+    } else {
+      boutons.push(h('button', { class: 'bouton valider', onclick: function () { changerLigne(x.numero, 0, true); } }, [icone('envoyer'), 'Envoyer sans ' + etiquette]));
+    }
+    return h('div', { class: 'bloc-en-cause' }, [
+      ligne,
+      h('p', { class: 'phrase-en-cause' }, [r.phrase + (r.genre === 'trop' ? ' Demande-les en boutique.' : '')]),
+      h('div', { class: 'rangee' }, boutons),
+    ]);
+  }
+  /** Une ligne changée après un refus : nouvelle paire (le QR suit), puis, si demandé, l'envoi tout de suite. */
+  function changerLigne(numero, quantite, renvoyer) {
+    if (quantite > 0) etat.panier.q[numero] = quantite;
+    else delete etat.panier.q[numero];
+    garder();
+    delete etat.refusLignes[numero];
+    if (!lignes().length) { etat.envoi = null; vueVitrineEnLigne(); return; }
+    var e = etat.envoi;
+    e.lignes = lignesEnvoi();
+    nouvellePaire(e);
+    e.etat = 'pret';
+    garderEnvoi(e);
+    if (renvoyer) envoyer();
+    else vueTonPanier();
+  }
+
+  // ------------------------------------------------------------ le prénom et le numéro
+
+  /** Le drapeau d'un pays, dessiné d'après la liste de numero.js (cadre de 60 x 40), comme la page du live. */
+  function drapeau(code) {
+    var s = svg('svg', { viewBox: '0 0 60 40', preserveAspectRatio: 'none', class: 'drapeau', 'aria-hidden': 'true' });
+    N.pays(code).f.forEach(function (f) {
+      if (f[0] === 'r') s.appendChild(svg('rect', { x: f[1], y: f[2], width: f[3], height: f[4], fill: f[5] }));
+      else if (f[0] === 'c') s.appendChild(svg('circle', { cx: f[1], cy: f[2], r: f[3], fill: f[4] }));
+      else if (f[0] === 'p') s.appendChild(svg('polygon', { points: f[1], fill: f[2] }));
+      else if (f[0] === 'l') s.appendChild(svg('line', { x1: f[1], y1: f[2], x2: f[3], y2: f[4], 'stroke-width': f[5], stroke: f[6] }));
+      else s.appendChild(svg('polygon', { points: f[1], fill: 'none', 'stroke-width': f[2], stroke: f[3] }));
+    });
+    return s;
+  }
+  /** Le pays du numéro : celui que le client a choisi, sinon celui du WhatsApp de la boutique. */
+  function paysParDefaut(client) {
+    if (etat.pays) return etat.pays;
+    if (client && client.pays) return client.pays;
+    var p = whatsappBoutique() ? N.paysDe(whatsappBoutique()) : null;
+    return p ? p.c : N.PAYS[0].c;
+  }
+
+  /**
+   * La première fois : deux champs, chacun avec son étiquette au-dessus. Les fois suivantes, le prénom
+   * et le numéro retenus, avec « Changer » (le crayon) et « Pas toi ? Changer » (un téléphone prêté).
+   */
+  function blocClient(e, client, nom) {
+    var qui = nom && nom.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '_').length <= 20 ? nom : 'la boutique';
+    var pourquoi = h('p', { class: 'note' }, [icone('bouclier', 'petite'), 'Seule ' + qui + ' le voit, pour t’appeler au sujet de ce panier. Effacé 7 jours après.']);
+    if (client && !etat.brouillon) {
+      return h('div', { class: 'carte' }, [
+        h('div', { class: 'identite' }, [
+          icone('personne'),
+          h('span', { class: 'qui' }, [h('span', { class: 'prenom' }, [client.prenom || 'Sans prénom']), h('span', { class: 'numero-client' }, [N.formater(client.telephone)])]),
+          h('button', { class: 'crayon', 'aria-label': 'Changer mon prénom ou mon numéro', onclick: function () {
+            etat.brouillon = { prenom: client.prenom, telephone: N.depuis(client.telephone, paysParDefaut(client)).national };
+            etat.pays = N.depuis(client.telephone, paysParDefaut(client)).pays;
+            vueTonPanier();
+          } }, [icone('crayon')]),
+        ]),
+        pourquoi,
+        h('div', { class: 'rang-liens' }, [
+          h('button', { class: 'lien-discret', onclick: function () { etat.changerClient = true; etat.brouillon = { prenom: '', telephone: '' }; vueTonPanier(); } }, ['Pas toi ? Changer']),
+          h('button', { class: 'lien-discret', onclick: function () { effacer(STOCKAGE + 'client'); etat.brouillon = { prenom: '', telephone: '' }; vueTonPanier(); } }, ['Oublier']),
+        ]),
+      ]);
+    }
+    var brouillon = etat.brouillon || { prenom: '', telephone: '' };
+    var pays = paysParDefaut(client);
+    var lePays = N.pays(pays);
+    var erreur = etat.erreurChamp;
+    var prenom = h('input', { type: 'text', id: 'champ-prenom', maxlength: String(B.prenom), autocomplete: 'given-name', 'aria-label': 'Ton prénom' });
+    prenom.value = brouillon.prenom;
+    var coche = h('span', { class: 'coche-verte' + (N.analyser(brouillon.telephone, pays).etat === 'bon' ? '' : ' cache'), 'aria-hidden': 'true' }, [icone('coche')]);
+    var telephone = h('input', {
+      type: 'tel', id: 'champ-numero', inputmode: 'tel', autocomplete: 'tel', maxlength: String(N.CHIFFRES_MAX + 6), 'aria-label': 'Ton numéro', placeholder: N.exemple(pays),
+      oninput: function () {
+        etat.brouillon = { prenom: prenom.value, telephone: telephone.value };
+        // La longueur, vérifiée en direct : une coche verte quand elle est bonne.
+        var bon = N.analyser(telephone.value, pays).etat === 'bon';
+        coche.className = 'coche-verte' + (bon ? '' : ' cache');
+        if (telephone.parentNode) telephone.parentNode.className = 'champ tel' + (bon ? ' bon' : '');
+      },
+    });
+    telephone.value = brouillon.telephone;
+    prenom.addEventListener('input', function () { etat.brouillon = { prenom: prenom.value, telephone: telephone.value }; });
+    etat.champs = { prenom: prenom, telephone: telephone };
+    var autrePays = h('button', {
+      class: 'drapeau-bouton', type: 'button',
+      'aria-label': 'Pays du numéro : ' + lePays.n + ', indicatif ' + lePays.i + '. Toucher pour changer de pays',
+      onclick: function () { etat.brouillon = { prenom: prenom.value, telephone: telephone.value }; vuePays(); },
+    }, [drapeau(pays), h('span', { class: 'indicatif' }, ['+' + lePays.i]), icone('bas')]);
+    return h('div', { class: 'carte' }, [
+      h('label', { class: 'etiquette-champ', for: 'champ-prenom' }, [icone('personne', 'petite'), 'Ton prénom ', h('span', { class: 'facultatif' }, ['(si tu veux)'])]),
+      h('div', { class: 'champ' + (erreur && erreur.champ === 'prenom' ? ' faux' : '') }, [prenom]),
+      erreur && erreur.champ === 'prenom' ? h('p', { class: 'aide-erreur', role: 'alert' }, [erreur.texte]) : null,
+      h('label', { class: 'etiquette-champ', for: 'champ-numero' }, [icone('appel', 'petite'), 'Ton numéro']),
+      h('div', { class: 'champ tel' + (erreur && erreur.champ === 'telephone' ? ' faux' : (N.analyser(brouillon.telephone, pays).etat === 'bon' ? ' bon' : '')) }, [autrePays, telephone, coche]),
+      erreur && erreur.champ === 'telephone' ? h('p', { class: 'aide-erreur', role: 'alert' }, [erreur.texte]) : null,
+      pourquoi,
+    ]);
+  }
+
+  /** La liste des drapeaux : chaque pays se reconnaît à son dessin, et se dit à voix haute quand on le touche. */
+  function vuePays() {
+    etat.vue = 'pays';
+    app.className = '';
+    app.textContent = '';
+    app.appendChild(entete('Pays du numéro', vueTonPanier, 'Touche le drapeau du pays où ton numéro marche.'));
+    app.appendChild(h('div', { class: 'carte liste-pays' }, N.PAYS.map(function (p) {
+      return h('button', {
+        class: 'ligne-pays' + (p.c === etat.pays ? ' choisi' : ''), type: 'button', 'aria-label': p.n + ', indicatif ' + p.i,
+        onclick: function () { etat.pays = p.c; parler(p.n); vueTonPanier(); },
+      }, [drapeau(p.c), h('span', { class: 'nom-pays' }, [p.n]), h('span', { class: 'ind-pays' }, ['+' + p.i])]);
+    })));
+  }
+
+  /** Ce qui manque dit, écrit sous le champ, et le curseur dedans. Rien ne part. */
+  function erreurChamp(champ, texte) {
+    etat.erreurChamp = { champ: champ, texte: texte };
+    vueTonPanier();
+    parler(texte);
+    vibrer();
+    var c = etat.champs && etat.champs[champ];
+    if (c && c.focus) { try { c.focus(); } catch (e) { /* rien */ } }
+  }
+
+  // ------------------------------------------------------------ l'envoi
+
+  /** « Envoyer à … » : jamais grisé. Touché trop tôt, il va au champ qui manque et le dit. */
+  function envoyer() {
+    var e = etat.envoi;
+    if (!e || etat.envoiEnVol) return;
+    if (e.etat !== 'pret' && e.etat !== 'secours') return;
+    var client = etat.changerClient ? null : lireClient();
+    var prenom = '';
+    var telephone = '';
+    var pays = paysParDefaut(client);
+    if (client && !etat.brouillon) {
+      prenom = client.prenom;
+      telephone = client.telephone;
+    } else if (!etat.brouillon && !etat.changerClient && e.telephone) {
+      // Le secours, puis « Réessayer » : le numéro déjà donné pour ce panier.
+      prenom = e.prenom || '';
+      telephone = e.telephone;
+    } else {
+      var b = etat.brouillon || { prenom: '', telephone: '' };
+      prenom = F.nettoyerTexte(sansCoche(b.prenom || ''), B.prenom);
+      if (prenom && !F.prenomLisible(prenom)) { erreurChamp('prenom', Res.texteRefus('prenom_invalide')); return; }
+      var a = N.analyser(b.telephone || '', pays);
+      if (a.etat === 'vide') { erreurChamp('telephone', 'Il manque ton numéro.'); return; }
+      if (a.e164 === null || a.e164.length < B.telephoneMin || a.e164.length > B.telephoneMax) { erreurChamp('telephone', N.texteRefus(a)); return; }
+      telephone = a.e164;
+      garderClient(prenom, telephone, pays);
+      etat.brouillon = null;
+      etat.changerClient = false;
+    }
+    etat.erreurChamp = null;
+    etat.repriseEnvoi = false;
+    e.prenom = prenom;
+    e.telephone = telephone;
+    e.etat = 'envoi';
+    garderEnvoi(e);
+    // Un ancien panier de ce client resté sans réponse part d'abord (annulé), puis celui-ci.
+    if (!aAnnuler().length) { essayer(1); return; }
+    annulerEnAttente().then(function () { if (etat.envoi === e && e.etat === 'envoi') essayer(1); });
+  }
+
+  /**
+   * Un essai : 10 s au plus, un seul nouvel essai automatique, la même paire à chaque fois. Deux
+   * échecs : le secours, et plus rien tout seul (un panier ne doit pas arriver après avoir été
+   * vendu au comptoir). Sans réseau sur le téléphone : le secours tout de suite.
+   */
+  function essayer(n) {
+    var e = etat.envoi;
+    if (!aLeReseau()) { secours('reseau'); return; }
+    etat.envoiEnVol = e;
+    etat.lent = false;
+    vueTonPanier();
+    var lent = setTimeout(function () {
+      if (etat.envoi !== e || e.etat !== 'envoi') return;
+      etat.lent = true;
+      if (etat.vue === 'ton-panier') vueTonPanier();
+      parler('Réseau lent, on continue. Ne ferme pas.');
+    }, B.envoiLentMs);
+    Res.commander(fetcher, etat.serveur, etat.code, {
+      demande: e.demande, jeton: e.jeton, prenom: e.prenom || '', telephone: e.telephone,
+      lignes: e.lignes.map(function (x) { return { numero: x.numero, quantite: x.quantite }; }),
+    }).then(function (r) {
+      clearTimeout(lent);
+      etat.envoiEnVol = null;
+      if (etat.envoi === e) { reponseEnvoi(e, r, n); return; }
+      // Le client est parti voir la vitrine pendant l'envoi : le panier arrivé est gardé pour son
+      // suivi ; s'il en a fait un autre depuis (d'autres lignes, une autre paire), celui-ci est annulé.
+      if (r && r.ok === true && r.panier && typeof r.panier === 'object') {
+        var stocke = lireEnvoi(e.code);
+        if (stocke && stocke.jeton === e.jeton) {
+          oublierEnvoi(e);
+          e.etat = 'envoye';
+          e.panier = r.panier;
+          e.ecart = typeof r.maintenant === 'number' ? r.maintenant - Date.now() : 0;
+          e.maj = Date.now();
+          garderSuivi(e);
+        } else annulerPlusTard(e.jeton);
+      }
+    }, function () {
+      clearTimeout(lent);
+      etat.envoiEnVol = null;
+      if (etat.envoi !== e) return;
+      if (n < 2 && aLeReseau()) essayer(n + 1);
+      else secours(aLeReseau() ? 'serveur' : 'reseau');
+    });
+  }
+
+  function reponseEnvoi(e, r, n) {
+    if (r && r.ok === true && r.panier && typeof r.panier === 'object') { envoye(e, r); return; }
+    var refus = r && r.refus;
+    if (refus === 'occupe') {
+      // La boutique reçoit un autre panier (ou une vente) à l'instant : c'est le nouvel essai
+      // automatique, après 2 à 3 secondes (le verrou est tenu le temps d'un échange) ; tout de suite,
+      // il retombait dans le même verrou et le client passait au secours pour rien.
+      if (n < 2) {
+        etat.envoiEnVol = e;
+        setTimeout(function () {
+          etat.envoiEnVol = null;
+          if (etat.envoi === e && e.etat === 'envoi') essayer(n + 1);
+        }, 2000 + Math.floor(Math.random() * 1000));
+      } else secours('serveur');
+      return;
+    }
+    if (refus === 'demande_prise' && !e.reprise) {
+      // L'identifiant est déjà celui d'un autre panier : une autre paire, le QR redessiné, et on renvoie (sans compter).
+      e.reprise = true;
+      nouvellePaire(e);
+      essayer(n);
+      return;
+    }
+    e.etat = 'pret';
+    garderEnvoi(e);
+    if (refus === 'deja_vendu') {
+      etat.dejaVendu = true;
+      vueTonPanier();
+      parler('La boutique a déjà servi ce panier.');
+      return;
+    }
+    if (refus === 'stock_insuffisant' || refus === 'quantite_trop_grande' || refus === 'article_absent') {
+      refusDesLignes(e, refus, r.detail);
+      return;
+    }
+    if (refus === 'prenom_invalide') {
+      etat.brouillon = { prenom: e.prenom || '', telephone: N.depuis(e.telephone, paysParDefaut(null)).national };
+      erreurChamp('prenom', Res.texteRefus('prenom_invalide'));
+      return;
+    }
+    if (refus === 'telephone_invalide') {
+      etat.brouillon = { prenom: e.prenom || '', telephone: N.depuis(e.telephone, paysParDefaut(null)).national };
+      erreurChamp('telephone', Res.texteRefus('telephone_invalide'));
+      return;
+    }
+    secours('serveur');
+  }
+
+  /**
+   * Le serveur nomme les lignes en cause (la forme de 0012) : chacune en orange, avec ce qu'on peut
+   * faire. Le stock exact n'est jamais dit au-delà de 3.
+   */
+  function refusDesLignes(e, refus, detail) {
+    etat.refusLignes = {};
+    var premiere = '';
+    (Array.isArray(detail) ? detail : []).forEach(function (d) {
+      var numero = typeof d === 'number' ? d : d && d.numero;
+      var x = e.lignes.filter(function (l) { return l.numero === numero; })[0];
+      if (!x) return;
+      var nom = nomDans(x);
+      var r;
+      if (refus === 'article_absent') r = { genre: 'absent', phrase: 'Plus ' + Res.de(nom) + ' en vente.' };
+      else if (refus === 'quantite_trop_grande') r = { genre: 'trop', phrase: 'Trop ' + Res.de(nom) + ' pour un panier.' };
+      else if (d.reste >= 1 && d.reste <= 3) r = { genre: 'reste', reste: d.reste, phrase: 'Il ne reste que ' + d.reste + ' ' + nom + '.' };
+      else if (d.niveau === 'epuise' || d.reste === 0) r = { genre: 'epuise', phrase: 'Plus ' + Res.de(nom) + '.' };
+      else r = { genre: 'trop', phrase: 'Trop ' + Res.de(nom) + ' pour un panier.' };
+      etat.refusLignes[x.numero] = r;
+      if (!premiere) premiere = r.phrase;
+    });
+    if (!premiere) { secours('serveur'); return; }
+    vueTonPanier();
+    parler(premiere);
+    vibrer();
+  }
+
+  /** Les deux échecs : la phrase dit qui est en cause ; le code et WhatsApp sont déjà là, le même panier. */
+  function secours(cause) {
+    var e = etat.envoi;
+    etat.envoiEnVol = null;
+    etat.lent = false;
+    etat.cause = cause;
+    e.etat = 'secours';
+    garderEnvoi(e);
+    vueTonPanier();
+    parler(texteSecours());
+    vibrer();
+  }
+
+  function blocSecours(e, lien, lienWa, codeDAbord) {
+    var boutonWa = lienWa ? h('a', { class: 'bouton valider large geant', rel: 'noopener noreferrer', href: lienWa }, [icone('whatsapp'), 'Envoyer par WhatsApp']) : null;
+    // Dans le navigateur de TikTok ou de Facebook, sous WhatsApp seulement : le même panier, son jeton, dans Chrome.
+    var contenuSansPrenom = lienDuPanier(e, '');
+    var versChrome = lienWa && INTEGRE && ANDROID && etat.contenu ? F.lienChrome(adressePage(), etat.contenu, contenuSansPrenom, e.jeton) : null;
+    var chrome = versChrome ? h('a', { class: 'bouton neutre large espace', href: versChrome }, [icone('navigateur'), 'Pour WhatsApp, ouvre avec Chrome']) : null;
+    var reessayer = h('button', { class: 'bouton neutre large espace', onclick: function () { envoyer(); } }, [icone('recommencer'), 'Réessayer']);
+    var meme = h('p', { class: 'note' }, [icone('bouclier', 'petite'), MEME_PANIER]);
+    if (codeDAbord) {
+      return h('div', { style: 'margin:12px 16px 0' }, [meme, h('div', { class: 'rangee' }, [
+        h('button', { class: 'bouton neutre', onclick: function () { envoyer(); } }, [icone('recommencer'), 'Réessayer']),
+        lienWa ? h('a', { class: 'bouton valider', rel: 'noopener noreferrer', href: lienWa }, [icone('whatsapp'), 'Envoyer']) : null,
+      ]), chrome]);
+    }
+    // Depuis un lien partagé, le client est sans doute chez lui : WhatsApp d'abord, le code en petit.
+    return h('div', {}, [
+      h('div', { style: 'margin:12px 16px 0' }, [boutonWa, chrome, reessayer, meme]),
+      h('div', { class: 'carte petit-code' }, [h('div', { class: 'titre-carte petit' }, [icone('code'), 'ou montre ce code au vendeur']), dessinQrSur(lien)]),
+    ]);
+  }
+
+  function texteTonPanier(e, client, secours) {
+    var l = e.lignes;
+    var t = 'Ton panier : ' + articles(F.nombreArticles(l)) + ', ' + totalDe(l) + ' francs. ';
+    if (secours) return t + texteSecours() + ' ' + MEME_PANIER + ' ' + GARDE;
+    var refus = Object.keys(etat.refusLignes);
+    if (refus.length) t += etat.refusLignes[refus[0]].phrase + ' ';
+    if (etat.changements.length) t += etat.changements.join(' ') + ' ';
+    t += notePrix() + ' ';
+    if (!client || etat.brouillon) t += 'Écris ton numéro de téléphone, et ton prénom si tu veux. Seule la boutique le voit, pour t’appeler au sujet de ce panier. Effacé 7 jours après. ';
+    t += 'Et après : elle reçoit ton panier, elle confirme ou t’appelle, puis tu paies et prends tes articles à la boutique. ' + ARGENT + ' ';
+    t += 'Touche ' + libelleEnvoyer() + '. Ou montre ce code au vendeur. ';
+    return t + GARDE + ' ' + R.informationVitrine(nomBoutique(), '', true);
+  }
+
+  /** Le panier est arrivé : son numéro, comme un ticket ; le suivi commence. */
+  function envoye(e, r) {
+    oublierEnvoi(e);
+    e.etat = 'envoye';
+    e.panier = r.panier;
+    e.ecart = typeof r.maintenant === 'number' ? r.maintenant - Date.now() : 0;
+    e.maj = Date.now();
+    garderSuivi(e);
+    etat.dejaVendu = false;
+    etat.refusLignes = {};
+    etat.changements = [];
+    // Le panier est parti : la vitrine repart d'un panier vide (un autre panier sera un autre identifiant).
+    etat.panier = nouveauPanier();
+    garder();
+    vibrer();
+    parler('Panier envoyé. Ton panier porte le numéro ' + r.panier.numero + '.');
+    vueSuivi();
+  }
+
+  // ------------------------------------------------------------ les paniers envoyés, suivis d'ici
+
+  /** Les paniers envoyés de cette vitrine (3 au plus, le plus récent d'abord), gardés jusqu'à leur fin. */
+  function lireSuivis(code) {
+    var s = lire(STOCKAGE + 'suivis.' + code);
+    var t = Date.now();
+    if (!Array.isArray(s)) return [];
+    return s.filter(function (e) {
+      return e && e.code === code && typeof e.demande === 'string' && /^[0-9a-f]{8}$/.test(e.demande) && typeof e.jeton === 'string' &&
+        /^[0-9a-f]{64}$/.test(e.jeton) && typeof e.t === 'number' && t - e.t <= DUREE_ENVOI && e.t <= t + 60000 &&
+        !(e.panier && Res && Res.estFini(e.panier.etat) && !suiviApresServi(e));
+    }).slice(0, 3);
+  }
+  function garderSuivi(e) {
+    var s = lireSuivis(e.code).filter(function (x) { return x.jeton !== e.jeton; });
+    s.unshift(e);
+    ecrire(STOCKAGE + 'suivis.' + e.code, s.slice(0, 3));
+  }
+  function oublierSuivi(e) {
+    var s = lireSuivis(e.code).filter(function (x) { return x.jeton !== e.jeton; });
+    if (s.length) ecrire(STOCKAGE + 'suivis.' + e.code, s);
+    else effacer(STOCKAGE + 'suivis.' + e.code);
+  }
+
+  var minuteurSuivi = 0;
+  function arreterSuivi() {
+    clearTimeout(minuteurSuivi);
+    minuteurSuivi = 0;
+  }
+  /**
+   * Toutes les 15 secondes pendant 10 minutes, puis toutes les minutes ; seulement page visible ; plus
+   * rien à la fin, sauf un panier servi, encore relu toutes les minutes pendant 30 minutes.
+   */
+  function programmerRelecture() {
+    arreterSuivi();
+    var e = etat.envoi;
+    if (!e || etat.vue !== 'suivi' || (e.panier && Res.estFini(e.panier.etat) && !suiviApresServi(e))) return;
+    var age = e.panier ? maintenantServeur() - e.panier.cree_le : 0;
+    var fini = !!e.panier && Res.estFini(e.panier.etat);
+    var delai = !fini && age < B.suiviRapidePendantMs ? B.suiviRapideMs : B.suiviLentMs;
+    minuteurSuivi = setTimeout(function () {
+      minuteurSuivi = 0;
+      if (visible()) relire();
+    }, Math.max(delai, etat.freineJusqua - Date.now()));
+  }
+  function relire() {
+    var e = etat.envoi;
+    if (!e || etat.relecture) return;
+    arreterSuivi();
+    if (!aLeReseau()) {
+      etat.horsLigne = true;
+      redessinerSuivi(false);
+      programmerRelecture();
+      return;
+    }
+    etat.relecture = true;
+    Res.monPanier(fetcher, etat.serveur, e.jeton).then(function (r) {
+      etat.relecture = false;
+      if (etat.envoi !== e) return;
+      etat.horsLigne = false;
+      // Refusée (trop de demandes : une adresse partagée par beaucoup de téléphones) : la page le dit,
+      // garde la dernière nouvelle, et relit moins souvent (5 minutes) au lieu de se taire.
+      etat.serveurOccupe = !!(r && r.refus === 'trop_de_demandes');
+      etat.freineJusqua = etat.serveurOccupe ? Date.now() + 5 * B.suiviLentMs : 0;
+      if (r && r.ok === true && r.panier && typeof r.panier === 'object') nouvelles(e, r);
+      else if (r && r.refus === 'panier_inconnu') { panierPerdu(e); return; }
+      redessinerSuivi(false);
+      programmerRelecture();
+    }, function () {
+      etat.relecture = false;
+      if (etat.envoi !== e) return;
+      etat.horsLigne = true;
+      redessinerSuivi(false);
+      programmerRelecture();
+    });
+  }
+  /**
+   * Ce que le serveur dit du panier. À la fin, il rejoint les derniers paniers, et l'identifiant et le
+   * jeton sont oubliés (un panier servi, 30 minutes après : une vente défaite le rend, il revient).
+   */
+  function nouvelles(e, r) {
+    var avant = e.panier;
+    e.panier = r.panier;
+    e.ecart = typeof r.maintenant === 'number' ? r.maintenant - Date.now() : e.ecart || 0;
+    e.maj = Date.now();
+    if (Res.estFini(r.panier.etat)) {
+      if (!avant || avant.etat !== r.panier.etat) rangerDernier(e);
+      if (suiviApresServi(e)) garderSuivi(e);
+      else oublierSuivi(e);
+    } else {
+      if (avant && Res.estFini(avant.etat)) retirerDernier(r.panier);
+      garderSuivi(e);
+    }
+    if (avant && (avant.etat !== r.panier.etat || !avant.recu_le !== !r.panier.recu_le)) annoncer(r.panier);
+  }
+  /** Un changement : le titre de l'onglet, une vibration et la voix si la page a déjà été touchée. L'écran porte toujours tout. */
+  function annoncer(p) {
+    document.title = titreEtat(p) + ' · ' + nomBoutique();
+    if (!etat.touche) return;
+    vibrer();
+    parler(phraseEtat(p));
+  }
+  function titreEtat(p) {
+    return { attente: 'Envoyé', recu: 'Reçu', pret: 'Prêt', pris: 'En cours', vendu: 'Servi', refuse: 'Refusé', annule: 'Annulé', expire: 'Sans réponse' }[p.etat] || 'Ton panier';
+  }
+  function lignesManquantes(p) {
+    return p.lignes.filter(function (l) { return l.fin === 'manquante'; });
+  }
+  function phraseEtat(p) {
+    var nom = nomBoutique() || 'La boutique';
+    switch (p.etat) {
+      case 'recu': return 'La boutique a reçu ton panier.';
+      case 'pret': return 'C’est prêt. Passe le chercher avec ton numéro ' + p.numero + '.';
+      case 'pris': return 'La boutique est en train de servir ton panier.';
+      case 'vendu': return 'C’est servi. Merci !';
+      case 'refuse':
+        if (p.motif === 'pas_aujourdhui') return 'La boutique ne sert pas aujourd’hui.';
+        var m = lignesManquantes(p);
+        return m.length ? 'La boutique ne peut pas : il n’y a plus ' + Res.de(nomDans(m[0])) + '.' : 'La boutique ne peut pas.';
+      case 'annule': return 'Panier annulé.';
+      case 'expire': return nom + ' n’a pas pu te répondre à temps. Ton panier est annulé, rien n’est dû.';
+      default: return 'Ton panier porte le numéro ' + p.numero + '.';
+    }
+  }
+  /** Le serveur ne connaît plus ce panier (effacé, ou jeton faux) : la page l'oublie. */
+  function panierPerdu(e) {
+    oublierSuivi(e);
+    etat.envoi = null;
+    arreterSuivi();
+    etat.vue = 'perdu';
+    app.className = '';
+    app.textContent = '';
+    app.appendChild(entete(nomBoutique() || 'Ton panier', 'sac', null, 'Ce panier n’existe plus.'));
+    app.appendChild(h('div', { class: 'erreur' }, [
+      h('div', { class: 'rond-erreur neutre' }, [icone('panier')]),
+      h('h1', {}, ['Ce panier n’existe plus.']),
+    ]));
+    app.appendChild(h('div', { style: 'margin:16px' }, [h('button', { class: 'bouton neutre large', onclick: revenirALaVitrine }, [icone('sac'), 'Voir la vitrine'])]));
+  }
+
+  // ------------------------------------------------------------ « Ton panier n° 4 »
+
+  /** Ne redessine que si ce qui se voit a changé (l'état, les heures, la minute de la dernière nouvelle…). */
+  function redessinerSuivi(force) {
+    if (etat.vue !== 'suivi') return;
+    var e = etat.envoi;
+    var p = e && e.panier;
+    var signature = [p ? [p.etat, p.recu_le, p.pret_le, p.boutique_absente, p.fini_le].join('/') : '', etat.horsLigne, etat.serveurOccupe, prevenirGros(e),
+      e && e.maj && !(p && Res.estFini(p.etat)) ? Math.floor(e.maj / 60000) : 0, etat.garder, etat.annuler].join('|');
+    if (!force && signature === etat.signature) return;
+    vueSuivi();
+  }
+  /** « Prévenir sur WhatsApp » devient le gros bouton vert : pas de ✓✓ après 10 minutes, ou personne à la boutique depuis 30 minutes. */
+  function prevenirGros(e) {
+    var p = e && e.panier;
+    if (!p || !Res.estVivant(p.etat) || p.recu_le) return false;
+    return p.boutique_absente === true || maintenantServeur() - p.cree_le >= B.prevenirGrosMs;
+  }
+
+  function vueSuivi() {
+    var e = etat.envoi;
+    var p = e.panier;
+    etat.vue = 'suivi';
+    app.className = '';
+    app.textContent = '';
+    var nom = nomBoutique();
+    etat.signature = [p ? [p.etat, p.recu_le, p.pret_le, p.boutique_absente, p.fini_le].join('/') : '', etat.horsLigne, etat.serveurOccupe, prevenirGros(e),
+      e.maj && !(p && Res.estFini(p.etat)) ? Math.floor(e.maj / 60000) : 0, etat.garder, etat.annuler].join('|');
+    app.appendChild(entete(nom || 'Ton panier', 'sac', null, function () { return texteSuivi(e); }));
+    if (!p) {
+      app.appendChild(h('div', { class: 'attente' }, [h('span', { class: 'anneau', 'aria-hidden': 'true' }), 'Je regarde ton panier…']));
+      app.appendChild(ligneMiseAJour(e));
+      app.appendChild(piedEnLigne());
+      programmerRelecture();
+      return;
+    }
+    document.title = titreEtat(p) + ' · ' + nom;
+    if (Res.estFini(p.etat)) {
+      vueFin(e, p);
+      return;
+    }
+    var recu = !!p.recu_le;
+    // Le numéro comme un ticket, jamais une place dans une file.
+    app.appendChild(h('div', { class: 'carte ticket' }, [
+      h('span', { class: 'rond-numero', 'aria-hidden': 'true' }, [String(p.numero)]),
+      h('span', { class: 'ticket-texte' }, [
+        h('span', { class: 'ticket-titre' }, [icone('panier', 'petite'), 'Ton panier n° ' + p.numero]),
+        h('span', { class: 'ticket-date' }, [Res.dateLongue(p.cree_le)]),
+      ]),
+    ]));
+    app.appendChild(h('div', { class: 'etapes' }, [
+      etape('coche', 'Envoyé', Res.heure(p.cree_le), true),
+      etape('deuxCoches', 'Reçu', recu ? Res.heure(p.recu_le) : '', recu),
+      etape('panier', p.etat === 'pret' ? 'Prêt' : 'Servi', p.etat === 'pret' && p.pret_le ? Res.heure(p.pret_le) : '', p.etat === 'pret'),
+    ]));
+    if (p.etat === 'pris') {
+      app.appendChild(h('div', { class: 'bandeau ok' }, [h('div', { class: 'rang' }, [icone('panier'), 'La boutique est en train de servir ton panier.'])]));
+    } else if (p.etat === 'pret') {
+      app.appendChild(h('div', { class: 'bandeau ok' }, [h('div', { class: 'rang' }, [icone('panier'), 'C’est prêt. Passe le chercher avec ton n° ' + p.numero + '.'])]));
+    } else if (recu) {
+      app.appendChild(h('div', { class: 'carte maintenant' }, [
+        h('span', { class: 'rond-etape' }, [icone('appel')]),
+        h('span', {}, [h('strong', {}, ['Et maintenant']), h('span', { class: 'bloc' }, [texteEtMaintenant(e, p)])]),
+      ]));
+    } else {
+      if (p.delai_habituel) app.appendChild(h('p', { class: 'note marge' }, [icone('horloge', 'petite'), 'D’habitude, la boutique voit les paniers en ' + p.delai_habituel + ' min environ.']));
+      // Pas encore reçu : le code en gros, pour un client déjà au comptoir.
+      app.appendChild(h('div', { class: 'carte' }, [h('div', { class: 'titre-carte petit' }, [icone('telephone'), 'Au comptoir, montre ce code']), dessinQrSur(adressePage() + '#p=' + lienDuPanierVu(e, p))]));
+    }
+    app.appendChild(carteLignesVues(p, false));
+    if (p.etat !== 'pris') {
+      app.appendChild(h('p', { class: 'note marge' }, [icone('horloge', 'petite'), 'Sans réponse avant ' + Res.quand(p.expire_le, maintenantServeur()) + ', ton panier s’annule tout seul. Rien n’est dû.']));
+    }
+    app.appendChild(h('p', { class: 'note marge' }, ['Tu peux fermer cette page. Rouvre le lien de la boutique pour voir la réponse.']));
+    var gros = prevenirGros(e);
+    if (gros) app.appendChild(h('div', { class: 'bandeau vieux' }, [h('div', { class: 'rang' }, [icone('whatsapp'), 'La boutique est peut-être occupée. Préviens-la sur WhatsApp.'])]));
+    var prevenir = lienPrevenir(e, p);
+    app.appendChild(h('div', { class: 'rangee marge' }, [
+      h('button', { class: 'bouton neutre', onclick: function () { etat.garder = !etat.garder; garderMonSuivi(e); } }, [icone('lien'), 'Garder mon suivi']),
+      prevenir && !gros ? h('a', { class: 'bouton neutre', rel: 'noopener noreferrer', href: prevenir }, [icone('whatsapp'), 'Prévenir']) : null,
+    ]));
+    if (prevenir && gros) app.appendChild(h('div', { class: 'marge' }, [h('a', { class: 'bouton valider large geant', rel: 'noopener noreferrer', href: prevenir }, [icone('whatsapp'), 'Prévenir sur WhatsApp'])]));
+    if (etat.garder) app.appendChild(blocGarder(e));
+    app.appendChild(ligneMiseAJour(e));
+    app.appendChild(h('p', { class: 'argent' }, [icone('billets'), ARGENT]));
+    app.appendChild(autresPaniers(e));
+    if (catalogueConnu()) app.appendChild(h('div', { class: 'marge' }, [h('button', { class: 'bouton neutre large', onclick: revenirALaVitrine }, [icone('sac'), 'Voir la vitrine'])]));
+    if (p.etat !== 'pris' || etat.annuler === 'pris') app.appendChild(blocAnnuler(e, p));
+    app.appendChild(piedEnLigne());
+    programmerRelecture();
+  }
+  /** Le lien de la vitrine est connu ici (ouvert d'elle, ou gardé) : « Voir la vitrine » y mène. */
+  function catalogueConnu() {
+    var gardee = etat.code ? lire(STOCKAGE + 'catalogue.' + etat.code) : null;
+    return !!etat.contenu || !!(gardee && typeof gardee.c === 'string');
+  }
+
+  function etape(dessin, nom, heure, fait) {
+    return h('span', { class: 'etape' + (fait ? ' faite' : '') }, [
+      h('span', { class: 'rond-coche' }, [icone(dessin)]),
+      h('span', { class: 'etape-nom' }, [nom]),
+      h('span', { class: 'etape-heure' }, [heure]),
+    ]);
+  }
+  /** « Elle peut t'appeler au 07 07 … 56 : réponds, même si tu ne connais pas le numéro. Ou passe avec ton n° 4. » */
+  function texteEtMaintenant(e, p) {
+    var tel = e.telephone ? N.depuis(e.telephone, paysParDefaut(null)).national : '';
+    var dit = tel.length >= 6 ? tel.slice(0, 2) + ' ' + tel.slice(2, 4) + ' … ' + tel.slice(-2) : '… ' + p.telephone_fin;
+    return 'La boutique a ton panier. Elle peut t’appeler au ' + dit + ' : réponds, même si tu ne connais pas le numéro. Ou passe avec ton n° ' + p.numero + '.';
+  }
+  function lienDuPanierVu(e, p) {
+    return F.versBase64url(F.encoderPanier({
+      cle: p.boutique.cle, demande: p.demande, prenom: F.prenomLisible(e.prenom || p.prenom || ''),
+      lignes: p.lignes.map(function (l) { return { numero: l.numero, quantite: l.quantite, prixVu: l.prix_unitaire }; }),
+    }));
+  }
+  /** Les photos et le total ; à la fin, chaque ligne servie ou non. */
+  function carteLignesVues(p, fin) {
+    var photos = {};
+    if (etat.cat) etat.cat.articles.forEach(function (a) { photos[a.numero] = a.photoNom; });
+    if (etat.envoi) etat.envoi.lignes.forEach(function (l) { if (l.photo) photos[l.numero] = l.photo; });
+    var n = 0;
+    return h('div', { class: 'carte' }, p.lignes.map(function (l) {
+      n += l.quantite;
+      var marque = !fin ? null : l.fin === 'servie' ? h('span', { class: 'fin-ligne oui', 'aria-label': 'Servi' }, [icone('coche')])
+        : l.fin === 'manquante' ? h('span', { class: 'fin-ligne manque', 'aria-label': 'Il n’y en avait plus' }, [icone('boiteVide')])
+          : l.fin === 'pas_servie' ? h('span', { class: 'fin-ligne non', 'aria-label': 'Pas servi' }, [icone('croix')]) : null;
+      return h('div', { class: 'ligne' + (l.fin === 'manquante' || l.fin === 'pas_servie' ? ' grisee' : '') }, [
+        vignette(l.numero, l.quantite, photos[l.numero]),
+        h('span', { class: 'ligne-nom' }, [l.quantite + ' × ' + (sansCoche(String(l.nom || '')) || 'Article n° ' + l.numero)]),
+        marque || h('span', { class: 'ligne-prix' }, [montant(l.quantite * l.prix_unitaire)]),
+      ]);
+    }).concat([h('div', { class: 'total-panier' }, [h('span', { class: 'combien' }, [fin ? 'Total du panier' : articles(n)]), h('span', { class: 'montant' }, [montant(p.total)])])]));
+  }
+  /** Le message tout écrit pour la boutique, et le lien du panier : à lui seul, c'est le chemin d'aujourd'hui. */
+  function lienPrevenir(e, p) {
+    var wa = whatsappBoutique();
+    if (!wa) return null;
+    var prenom = F.prenomLisible(e.prenom || p.prenom || '');
+    var texte = (prenom ? 'Bonjour, je suis ' + prenom + '.' : 'Bonjour.') + ' J’ai envoyé le panier n° ' + p.numero + ' (' +
+      F.formaterNombre(p.total).replace(/ /g, ' ') + ' F) sur ta vitrine.\n' + adressePage() + '#p=' + lienDuPanierVu(e, p);
+    return F.lienWhatsApp(wa, texte);
+  }
+  function ligneMiseAJour(e) {
+    var texte = !e.maj ? '' : etat.horsLigne ? 'Pas de réseau : dernière nouvelle à ' + Res.heure(e.maj) + '.'
+      : etat.serveurOccupe ? 'Beaucoup de monde en ce moment : dernière nouvelle à ' + Res.heure(e.maj) + '. Je regarde de nouveau dans 5 minutes.'
+        : 'Mis à jour à ' + Res.heure(e.maj) + '.';
+    return h('div', { class: 'mise-a-jour marge' }, [
+      h('span', { class: 'note' }, [texte]),
+      h('button', { class: 'bouton neutre petit', onclick: function () { relire(); } }, [icone('recommencer'), 'Actualiser']),
+    ]);
+  }
+
+  /** « Garder mon suivi » : un lien à soi, le jeton dans la partie « # » (jamais envoyée à l'hébergeur de la page). */
+  function lienDeSuivi(e) {
+    return F.lienSuivi(adressePage(), e.code, e.demande, e.jeton);
+  }
+  function garderMonSuivi(e) {
+    if (etat.garder) {
+      copier(lienDeSuivi(e));
+      parler('Ton lien de suivi est copié. Garde-le : il rouvre ce panier dans n’importe quel navigateur. Qui a ce lien peut voir et annuler ce panier.');
+    }
+    redessinerSuivi(true);
+  }
+  function blocGarder(e) {
+    var lien = lienDeSuivi(e);
+    return h('div', { class: 'carte' }, [
+      h('div', { class: 'titre-carte petit' }, [icone('lien'), 'Ton lien de suivi (copié)']),
+      h('p', { class: 'lien-suivi' }, [lien]),
+      h('a', { class: 'bouton neutre large espace', rel: 'noopener noreferrer', href: 'https://wa.me/?text=' + encodeURIComponent(lien) }, [icone('whatsapp'), 'Me l’envoyer sur WhatsApp']),
+      h('p', { class: 'note' }, ['Qui a ce lien peut voir et annuler ce panier.']),
+    ]);
+  }
+
+  /** Les autres paniers envoyés à cette vitrine depuis ce téléphone. */
+  function autresPaniers(e) {
+    var autres = lireSuivis(e.code).filter(function (x) { return x.jeton !== e.jeton && x.panier; });
+    if (!autres.length) return h('div');
+    return h('div', { class: 'rangee marge' }, autres.map(function (x) {
+      return h('button', { class: 'bouton neutre', onclick: function () { etat.envoi = x; etat.garder = false; etat.annuler = ''; vueSuivi(); relire(); } }, [icone('panier'), 'Panier n° ' + x.panier.numero]);
+    }));
+  }
+
+  /** « Je ne veux plus ce panier » : discret, en bas ; la confirmation dit la suite. */
+  function blocAnnuler(e, p) {
+    if (etat.annuler === '') {
+      return h('div', { class: 'centre marge' }, [h('button', { class: 'lien-discret grand', onclick: function () { etat.annuler = 'question'; redessinerSuivi(true); parler('La boutique verra que tu l’annules. Rien n’est dû.'); } }, ['Je ne veux plus ce panier'])]);
+    }
+    if (etat.annuler === 'pris') {
+      var wa = whatsappBoutique();
+      return h('div', { class: 'bandeau vieux' }, [
+        h('div', { class: 'rang' }, [icone('appel'), 'La boutique est en train de le servir : appelle-la.']),
+        wa ? h('a', { class: 'bouton neutre large espace', href: 'tel:+' + wa }, [icone('appel'), numeroBoutique(wa)]) : null,
+      ]);
+    }
+    return h('div', { class: 'carte' }, [
+      h('p', { class: 'note' }, ['La boutique verra que tu l’annules. Rien n’est dû.']),
+      h('div', { class: 'rangee' }, [
+        h('button', { class: 'bouton annuler', onclick: function () { annulerMonPanier(e); } }, [icone('croix'), 'Annuler le panier']),
+        h('button', { class: 'bouton neutre', onclick: function () { etat.annuler = ''; redessinerSuivi(true); } }, ['Garder']),
+      ]),
+      etat.annuler === 'echec' ? h('p', { class: 'aide-erreur' }, ['Pas de réseau. Réessaie.']) : null,
+    ]);
+  }
+  function annulerMonPanier(e) {
+    Res.annulerMonPanier(fetcher, etat.serveur, e.jeton).then(function (r) {
+      if (etat.envoi !== e) return;
+      if (r && r.ok === true && r.panier) {
+        etat.annuler = '';
+        nouvelles(e, { maintenant: r.maintenant, panier: r.panier });
+        if (r.panier.etat === 'annule') parler('Panier annulé.');
+        redessinerSuivi(true);
+      } else if (r && r.refus === 'pris') {
+        if (r.panier) nouvelles(e, { maintenant: r.maintenant, panier: r.panier });
+        etat.annuler = 'pris';
+        redessinerSuivi(true);
+        parler('La boutique est en train de le servir : appelle-la.');
+      } else if (r && r.refus === 'panier_inconnu') panierPerdu(e);
+      else { etat.annuler = 'echec'; redessinerSuivi(true); }
+    }, function () {
+      if (etat.envoi !== e) return;
+      etat.annuler = 'echec';
+      redessinerSuivi(true);
+      parler('Pas de réseau. Réessaie.');
+    });
+  }
+
+  // ------------------------------------------------------------ les fins
+
+  function vueFin(e, p) {
+    arreterSuivi();
+    var nom = nomBoutique() || 'La boutique';
+    var wa = whatsappBoutique();
+    var phrase = phraseEtat(p);
+    var vendu = p.etat === 'vendu';
+    app.appendChild(h('div', { class: 'fin' }, [
+      h('div', { class: 'rond-fin ' + (vendu ? 'vert' : 'neutre') }, [icone(vendu ? 'panier' : p.etat === 'refuse' ? (p.motif === 'pas_aujourdhui' ? 'calendrier' : 'boiteVide') : p.etat === 'expire' ? 'horloge' : 'croix'),
+        vendu ? h('span', { class: 'coche-fin' }, [icone('coche')]) : null]),
+      h('h1', {}, [vendu ? 'C’est servi. Merci !' : phrase]),
+    ]));
+    // Un résumé à garder (il tient dans une capture d'écran) : le numéro, la date, chaque ligne.
+    app.appendChild(h('div', { class: 'carte ticket' }, [
+      h('span', { class: 'rond-numero petit', 'aria-hidden': 'true' }, [String(p.numero)]),
+      h('span', { class: 'ticket-texte' }, [
+        h('span', { class: 'ticket-titre' }, ['Ton panier n° ' + p.numero]),
+        h('span', { class: 'ticket-date' }, [nom + ' · ' + Res.dateLongue(p.fini_le || p.cree_le) + ', ' + Res.heure(p.fini_le || p.cree_le)]),
+      ]),
+    ]));
+    app.appendChild(carteLignesVues(p, true));
+    var boutons = [];
+    var lignesDe = p.lignes.map(function (l) { return { numero: l.numero, quantite: l.quantite, nom: l.nom, prix: l.prix_unitaire }; });
+    if (p.etat === 'refuse' && p.motif === 'pas_aujourdhui') {
+      boutons.push(h('button', { class: 'bouton neutre large espace', onclick: revenirALaVitrine }, [icone('calendrier'), 'Refaire demain']));
+    } else if (p.etat === 'refuse') {
+      var sauf = lignesManquantes(p).map(function (l) { return l.numero; });
+      boutons.push(h('button', { class: 'bouton valider large geant espace', onclick: function () { refaire(lignesDe, sauf); } }, [icone('recommencer'), 'Refaire un panier']));
+    } else if (p.etat === 'annule') {
+      boutons.push(h('button', { class: 'bouton valider large espace', onclick: function () { refaire(lignesDe, []); } }, [icone('recommencer'), 'Refaire un panier']));
+    } else {
+      if (p.etat === 'expire' && wa) {
+        boutons.push(h('a', { class: 'bouton valider large espace', rel: 'noopener noreferrer', href: F.lienWhatsApp(wa, 'Bonjour, j’avais envoyé le panier n° ' + p.numero + ' sur ta vitrine.') }, [icone('whatsapp'), 'Lui écrire sur WhatsApp']));
+      }
+      boutons.push(h('button', { class: 'bouton neutre large espace', onclick: function () { refaire(lignesDe, []); } }, [icone('recommencer'), 'Refaire ce panier']));
+    }
+    if (vendu && etat.contenu) {
+      // Le lien de la vitrine, marqué « lien partagé », sans rien de personnel. Aucune récompense.
+      var partage;
+      try { partage = adressePage() + '#c=' + F.changerOrigine(etat.contenu, 'lien'); } catch (x) { partage = ''; }
+      if (partage) boutons.push(h('a', { class: 'bouton neutre large espace', rel: 'noopener noreferrer', href: 'https://wa.me/?text=' + encodeURIComponent('Voici la vitrine de ' + nom + ' : ' + partage) }, [icone('partager'), 'Partager cette boutique']));
+    }
+    app.appendChild(h('div', { class: 'marge' }, boutons));
+    app.appendChild(autresPaniers(e));
+    app.appendChild(piedEnLigne());
+  }
+
+  function texteSuivi(e) {
+    var p = e.panier;
+    if (!p) return 'Je regarde ton panier. ' + GARDE;
+    var t = phraseEtat(p) + ' ';
+    if (Res.estVivant(p.etat)) {
+      t = 'Ton panier porte le numéro ' + p.numero + '. Envoyé à ' + Res.heure(p.cree_le) + '. ';
+      if (p.recu_le) t += 'La boutique a reçu ton panier à ' + Res.heure(p.recu_le) + '. ';
+      if (p.etat === 'pret' || p.etat === 'pris') t += phraseEtat(p) + ' ';
+      else if (p.recu_le) t += texteEtMaintenant(e, p) + ' ';
+      else if (p.delai_habituel) t += 'D’habitude, la boutique voit les paniers en ' + p.delai_habituel + ' minutes environ. ';
+      t += articles(p.lignes.reduce(function (s, l) { return s + l.quantite; }, 0)) + ', ' + p.total + ' francs. ';
+      if (p.etat !== 'pris') t += 'Sans réponse avant ' + Res.quand(p.expire_le, maintenantServeur()) + ', ton panier s’annule tout seul. Rien n’est dû. ';
+      if (prevenirGros(e)) t += 'La boutique est peut-être occupée. Préviens-la sur WhatsApp. ';
+      t += 'Tu peux fermer cette page. ' + ARGENT + ' ';
+    }
+    return t + GARDE;
+  }
+
+  // ------------------------------------------------------------ un lien de suivi (#s=) ouvert ici
+
+  /** Le serveur d'un lien de suivi : celui de la vitrine déjà vue ici, sinon le serveur officiel, sinon (essais) celui de l'ordinateur. */
+  function serveurDuSuivi(code) {
+    var gardee = lire(STOCKAGE + 'catalogue.' + code);
+    if (gardee && typeof gardee.c === 'string') {
+      try {
+        var lu = F.lireAdresse('#c=' + gardee.c);
+        if (lu.type === 'catalogue') {
+          var s = serveurDuCatalogue(lu.catalogue);
+          if (s) return s;
+        }
+      } catch (x) { /* rien */ }
+    }
+    if (R.SERVEUR_OFFICIEL) return Res.serveurEnLigne('https://' + R.SERVEUR_OFFICIEL + '.supabase.co');
+    return R.essai ? Res.serveurEnLigne('http://' + location.hostname + ':' + R.PORT_SERVEUR_ESSAI) : null;
+  }
+  function ouvrirSuivi(s) {
+    var serveur = Res && enLignePossible() ? serveurDuSuivi(s.code) : null;
+    if (!serveur) { vueErreur('suivi'); return; }
+    etat.serveur = serveur;
+    etat.code = s.code;
+    restreindreImages(serveur.url, true);
+    var gardee = lire(STOCKAGE + 'catalogue.' + s.code);
+    etat.contenu = gardee && typeof gardee.c === 'string' ? gardee.c : '';
+    var e = lireSuivis(s.code).filter(function (x) { return x.jeton === s.jeton; })[0];
+    if (!e) {
+      e = { code: s.code, cle: null, demande: s.demande, jeton: s.jeton, etat: 'envoye', t: Date.now(), lignes: [], panier: null };
+      garderSuivi(e);
+    }
+    etat.envoi = e;
+    vueSuivi();
+    relire();
+  }
+
   // ------------------------------------------------------------ départ
 
   function demarrer() {
+    arreterSuivi();
     var texte = location.hash;
     // Rouvert dans Chrome par lienChrome : le catalogue est dans « ?c= » ; on le remet après le « # ».
+    // Au secours de l'envoi direct, le panier et son jeton y sont aussi : rangés, puis retirés de l'adresse.
     if (!texte && /^\?c=/.test(location.search)) {
-      texte = '#' + location.search.slice(1);
+      var rc = F.lireRetourChrome(location.search);
+      texte = rc ? '#c=' + rc.c : '#' + location.search.slice(1);
+      etat.retourChrome = rc && rc.p && rc.j ? { p: rc.p, j: rc.j } : null;
       try { history.replaceState(null, '', adressePage() + texte); } catch (e) { /* rien */ }
     }
     etat.hash = texte;
+    etat.ligne = null;
+    etat.catLien = null;
+    etat.envoi = null;
+    etat.garder = false;
+    etat.annuler = '';
+    etat.refusLignes = {};
+    etat.changements = [];
+    etat.dejaVendu = false;
+    var suivi = F.lireSuivi(texte);
+    if (suivi) { ouvrirSuivi(suivi); return; }
+    if (/^#s=/.test(texte)) { vueErreur('abime'); return; }
     var lu;
     try { lu = F.lireAdresse(texte); } catch (e) { vueErreur(e.code || 'abime'); return; }
     if (lu.type === 'panier') { vuePanierRecu(lu.panier, lu.texte); return; }
@@ -1405,20 +3126,32 @@ return toQR;
     etat.contenu = lu.texte;
     etat.photos = {};
     var origine = F.originePhotos(lu.catalogue);
-    if (origine) restreindreImages(origine);
     etat.panier = chargerPanier();
     etat.repris = etat.panier.montre !== '';
+    if (lu.catalogue.enLigne) { choisirChemin(lu.catalogue); return; }
+    if (origine) restreindreImages(origine, false);
     vueVitrine();
   }
 
   window.addEventListener('popstate', function () {
-    if (etat.vue === 'panier') { vueVitrine(); window.scrollTo(0, etat.defile); }
+    if (etat.vue === 'panier' || etat.vue === 'ton-panier') { vueVitrine(); window.scrollTo(0, etat.defile); }
   });
   // Un autre lien dans le même onglet : tout autre hash que celui affiché redémarre la page.
   window.addEventListener('hashchange', function () {
     if (location.hash !== etat.hash) demarrer();
   });
+  // Revenu sur la page : la relecture tout de suite (le suivi ne court que page visible).
+  if (document.addEventListener) {
+    document.addEventListener('visibilitychange', function () {
+      if (visible() && etat.vue === 'suivi') relire();
+    });
+  }
+  window.addEventListener('online', function () {
+    annulerEnAttente();
+    if (etat.vue === 'suivi') relire();
+  });
   demarrer();
+  annulerEnAttente();
 })();
 </script>
 </body>

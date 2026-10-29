@@ -9,10 +9,11 @@
  *     si c'est un autre projet Supabase ;
  *   - le petit texte d'information en bas des pages (conditions d'utilisation, annexe B) : écrit
  *     une seule fois, montré et DIT par chaque page ;
- *   - le lien « Tes données » et le téléphone de l'éditeur, quand la boutique n'a pas de WhatsApp.
+ *   - le lien « Tes données » et le téléphone de l'éditeur, quand la boutique n'a pas de WhatsApp ;
+ *   - la clé publique du projet (D85) : la vitrine en ligne appelle le serveur avec elle seule.
  *
- * Avant de recopier la page en ligne : `npm run vitrine:reglages -- <adresse du projet>` écrit la
- * référence ci-dessous (outils/fixer-reglages-vitrine.mjs). Tant qu'elle est vide, aucune adresse
+ * Avant de recopier la page en ligne : `npm run vitrine:reglages -- <adresse du projet> --cle <clé
+ * publique>` écrit la référence et la clé ci-dessous (outils/fixer-reglages-vitrine.mjs). Tant qu'elle est vide, aucune adresse
  * hébergée n'est acceptée : la page le dit au lieu de parler à un serveur inconnu.
  *
  * ES2015, sans dépendance. Expose `SIGMA_REGLAGES` sur l'objet global.
@@ -21,9 +22,14 @@
   'use strict';
 
   /** La référence (20 signes) du projet Supabase de SigmaMarket. Vide : pas encore posée. */
-  var SERVEUR_OFFICIEL = '';
+  var SERVEUR_OFFICIEL = 'ndxfdlaepbectpdnlxuv';
   /** Le téléphone de l'éditeur, pour les clients d'une boutique sans WhatsApp. Vide : pas dit. */
   var TELEPHONE_EDITEUR = '';
+  /**
+   * La clé publique du projet (celle de l'application, publique elle aussi) : la vitrine en ligne
+   * (D85) appelle le serveur avec elle. Vide : la page garde le parcours d'aujourd'hui.
+   */
+  var CLE_PUBLIQUE = 'sb_publishable_flmk8kmIlF_yINSvC872vw_U0VfavEi';
   /** Où mène « Tes données » (la page est dans le même dossier). */
   var PAGE_DONNEES = 'donnees.html';
 
@@ -97,12 +103,17 @@
 
   /**
    * Le petit texte en bas de la VITRINE (conditions d'utilisation, annexe B). `contact` : le numéro
-   * de la boutique tel qu'on le lit (vide s'il n'y en a pas).
+   * de la boutique tel qu'on le lit (vide s'il n'y en a pas). `enLigne` : la page peut envoyer le
+   * panier à la boutique (D85) ; elle dit alors ce qui part, et combien de temps cela reste.
    */
-  function informationVitrine(nom, contact) {
+  function informationVitrine(nom, contact, enLigne) {
     var n = nomPour(nom);
-    return (n ? 'Cette page est celle de la boutique « ' + n + ' », faite avec SigmaMarket.' : 'Cette page est faite avec SigmaMarket.') +
-      ' Ton panier, et ton prénom si tu le mets, restent dans ton téléphone 24 heures.' +
+    var debut = n ? 'Cette page est celle de la boutique « ' + n + ' », faite avec SigmaMarket.' : 'Cette page est faite avec SigmaMarket.';
+    if (enLigne) {
+      return debut + ' Si tu envoies ton panier, ton numéro (et ton prénom) vont à la boutique et restent 7 jours sur le serveur de SigmaMarket.' +
+        ' Ton téléphone garde ton prénom, ton numéro et tes 3 derniers paniers 30 jours au plus.' + questions(contact);
+    }
+    return debut + ' Ton panier, et ton prénom si tu le mets, restent dans ton téléphone 24 heures.' +
       ' La boutique les reçoit seulement quand tu les lui envoies.' + questions(contact);
   }
 
@@ -117,6 +128,8 @@
 
   racine.SIGMA_REGLAGES = {
     SERVEUR_OFFICIEL: SERVEUR_OFFICIEL,
+    CLE_PUBLIQUE: CLE_PUBLIQUE,
+    TELEPHONE_EDITEUR: TELEPHONE_EDITEUR,
     PAGE_DONNEES: PAGE_DONNEES,
     PORT_SERVEUR_ESSAI: PORT_SERVEUR_ESSAI,
     essai: essai,

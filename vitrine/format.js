@@ -7,12 +7,14 @@
  * allers-retours et sur des milliers de contenus abîmés ou fabriqués.
  *
  * Aucun appel réseau. Les petites photos (catalogue en version 2, D54) se chargent depuis le
- * serveur de la boutique, et de lui seul : adresseMiniature. Expose `VitrineFormat` sur l'objet global.
+ * serveur de la boutique, et de lui seul : adresseMiniature. Le catalogue en version 3 (D85) porte
+ * en plus le code de la vitrine en ligne et l'origine du lien (carré imprimé ou lien partagé) ; les
+ * appels au serveur sont dans reseau.js. Expose `VitrineFormat` sur l'objet global.
  */
 (function (racine) {
   'use strict';
 
-  const VERSION_CATALOGUE = 2;
+  const VERSION_CATALOGUE = 3;
   const VERSION_PANIER = 1;
   const TYPE_CATALOGUE = 1;
   const TYPE_PANIER = 2;
@@ -40,6 +42,10 @@
   const VERSION_PHOTO_MAX = 16383;
   const SERVEUR_COURT_MAX = 64;
   const BAC_VITRINE = 'vitrine';
+  /** Le code public d'une vitrine (D85) : 31 signes, sans 0, O, 1, I ni L, comme celui d'un live. */
+  const ALPHABET_CODE_VITRINE = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  const CODES_VITRINE = 852891037441;
+  const ORIGINES = ['carre', 'lien'];
 
   function erreur(code, detail) {
     let e = new Error(detail ? code + ' : ' + detail : code);
@@ -304,6 +310,9 @@
       terminer: function () {
         if (i !== fin) throw erreur('abime', 'octets en trop');
       },
+      position: function () {
+        return i;
+      },
     };
     return r;
   }
@@ -381,11 +390,40 @@
     return photos === null ? null : urlDuServeur(photos.serveur);
   }
 
+  // ---------------------------------------------------------------- le code de la vitrine en ligne (D85)
+
+  function estCodeVitrine(code) {
+    return typeof code === 'string' && /^[A-HJKMNP-Z2-9]{8}$/.test(code);
+  }
+  /** Le code lu en base 31, premier signe de poids fort (comme codeVitrineEnNombre de src/domain/vitrine.ts). */
+  function codeVitrineEnNombre(code) {
+    if (!estCodeVitrine(code)) throw erreur('hors_bornes', 'code ' + code);
+    let n = 0;
+    for (let k = 0; k < 8; k++) n = n * 31 + ALPHABET_CODE_VITRINE.indexOf(code.charAt(k));
+    return n;
+  }
+  function nombreEnCodeVitrine(n) {
+    if (!estEntier(n, 0, CODES_VITRINE - 1)) throw erreur('hors_bornes', 'code ' + n);
+    let code = '';
+    let reste = n;
+    for (let k = 0; k < 8; k++) {
+      code = ALPHABET_CODE_VITRINE.charAt(reste % 31) + code;
+      reste = Math.floor(reste / 31);
+    }
+    return code;
+  }
+
   // ---------------------------------------------------------------- catalogue et panier
 
   function decoderCatalogue(o) {
+    return lireCatalogue(o).catalogue;
+  }
+
+  /** Le catalogue, et où est l'octet de son origine (version 3) : changerOrigine le récrit. */
+  function lireCatalogue(o) {
     let r = ouvrir(o, TYPE_CATALOGUE, VERSION_CATALOGUE, BORNES.octetsCatalogue);
-    let avecPhotos = (o[0] & 15) === 2;
+    let version = o[0] & 15;
+    let avecPhotos = version >= 2;
     let cle = r.u32();
     let jour = nombreVersJour(r.varint(JOURS_MAX));
     let boutique = r.texte(BORNES.nomBoutique);
@@ -397,6 +435,18 @@
       let serveur = r.texte(SERVEUR_COURT_MAX);
       exiger(estServeurCourt(serveur), 'serveur');
       photos = { serveur: serveur, dossier: hexa8(cle) + hexa8(r.u32()) };
+    }
+    let enLigne = null;
+    let octetOrigine = -1;
+    if (version === 3) {
+      // 40 bits : par multiplications, jamais par décalages (les opérateurs de bits s'arrêtent à 32).
+      let code = 0;
+      for (let k = 0; k < 5; k++) code = code * 256 + r.u8();
+      exiger(code < CODES_VITRINE, 'code de la vitrine');
+      octetOrigine = r.position();
+      let origine = r.u8();
+      exiger(origine < ORIGINES.length, 'origine');
+      enLigne = { code: nombreEnCodeVitrine(code), origine: ORIGINES[origine] };
     }
     let n = r.varint(BORNES.articles);
     let articles = [];
@@ -422,10 +472,30 @@
       articles.push(article);
     }
     r.terminer();
-    exiger(!avecPhotos || unePhoto, 'version 2 sans photo');
+    exiger(version !== 2 || unePhoto, 'version 2 sans photo');
     let catalogue = { cle: cle, jour: jour, boutique: boutique, whatsapp: whatsapp, articles: articles };
     if (photos !== null) catalogue.photos = photos;
-    return catalogue;
+    if (enLigne !== null) catalogue.enLigne = enLigne;
+    return { catalogue: catalogue, octetOrigine: octetOrigine };
+  }
+
+  /**
+   * Le même catalogue (contenu base64url) avec une autre origine : « Partager cette boutique »
+   * envoie le lien de la vitrine marqué « lien partagé », même ouvert depuis le carré imprimé. Un
+   * catalogue sans vitrine en ligne (version 1 ou 2) revient tel quel.
+   */
+  function changerOrigine(contenu, origine) {
+    let o = depuisBase64url(contenu);
+    let lu = lireCatalogue(o);
+    let n = ORIGINES.indexOf(origine);
+    exiger(n >= 0, 'origine');
+    if (lu.octetOrigine < 0) return contenu;
+    o[lu.octetOrigine] = n;
+    let fin = o.length - 2;
+    let somme = fnv1a(o, fin) & 0xffff;
+    o[fin] = somme >>> 8;
+    o[fin + 1] = somme & 0xff;
+    return versBase64url(o);
   }
 
   function encoderPanier(panier) {
@@ -593,13 +663,44 @@
   /**
    * Rouvre le catalogue dans Chrome depuis le navigateur d'une autre application (Android).
    * Un intent ne porte pas de « # » : le catalogue passe en « ?c= », que la page relit et remet
-   * aussitôt après le « # ». Seulement le catalogue (public) ; jamais un panier, qui porte un prénom.
+   * aussitôt après le « # ». Le catalogue garde son code de vitrine (version 3) : il survit au passage.
+   * Au secours de l'envoi direct (D85), le lien emporte aussi le panier (`contenuPanier`, version 1,
+   * prénom vide : jamais un prénom dans une adresse) et son jeton, pour que Chrome rouvre « Ton
+   * panier » avec le même identifiant ; la page les range aussitôt et les retire de l'adresse.
    */
-  function lienChrome(page, contenuCatalogue) {
+  function lienChrome(page, contenuCatalogue, contenuPanier, jeton) {
     let m = /^(https?):\/\/([^#?]*)$/.exec(page);
     if (m === null) return null;
-    return 'intent://' + m[2] + '?c=' + contenuCatalogue + '#Intent;scheme=' + m[1] +
-      ';package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent(page + '#c=' + contenuCatalogue) + ';end';
+    let avecPanier = typeof contenuPanier === 'string' && /^[A-Za-z0-9_-]{1,800}$/.test(contenuPanier) &&
+      typeof jeton === 'string' && /^[0-9a-f]{64}$/.test(jeton);
+    return 'intent://' + m[2] + '?c=' + contenuCatalogue + (avecPanier ? '&p=' + contenuPanier + '&j=' + jeton : '') +
+      '#Intent;scheme=' + m[1] + ';package=com.android.chrome;S.browser_fallback_url=' +
+      encodeURIComponent(page + '#c=' + contenuCatalogue) + ';end';
+  }
+
+  /**
+   * Ce qu'un lien vers Chrome a mis dans « ?… » : { c, p, j } (p et j null s'ils manquent ou sont
+   * mal formés), ou null s'il n'y a pas de catalogue.
+   */
+  function lireRetourChrome(recherche) {
+    let m = /^\?c=([A-Za-z0-9_-]+)(?:&p=([A-Za-z0-9_-]+)&j=([0-9a-f]{64}))?$/.exec(String(recherche || ''));
+    if (m === null) return null;
+    return { c: m[1], p: m[2] || null, j: m[3] || null };
+  }
+
+  /**
+   * « Garder mon suivi » : `<page>#s=<code>.<demande>.<jeton>`. Le jeton reste dans la partie « # » :
+   * il n'est jamais envoyé à l'hébergeur de la page. Le lecteur de l'application ne lit que #c= et
+   * #p= : ce lien scanné par erreur n'est pas un panier.
+   */
+  function lienSuivi(page, code, demande, jeton) {
+    if (!estCodeVitrine(code) || !/^[0-9a-f]{8}$/.test(demande) || !/^[0-9a-f]{64}$/.test(jeton)) return null;
+    return String(page).split('#')[0].split('?')[0] + '#s=' + code + '.' + demande + '.' + jeton;
+  }
+  /** Le contraire de lienSuivi, sur la partie « # » d'une adresse : { code, demande, jeton }, ou null. */
+  function lireSuivi(hash) {
+    let m = /^#s=([A-HJKMNP-Z2-9]{8})\.([0-9a-f]{8})\.([0-9a-f]{64})$/.exec(String(hash || ''));
+    return m === null ? null : { code: m[1], demande: m[2], jeton: m[3] };
   }
 
   /** Navigateur intégré à une application (TikTok, Facebook, Instagram…) : il ouvre mal WhatsApp. */
@@ -635,6 +736,15 @@
     lienWhatsApp: lienWhatsApp,
     lienApplication: lienApplication,
     lienChrome: lienChrome,
+    lireRetourChrome: lireRetourChrome,
     estNavigateurIntegre: estNavigateurIntegre,
+    ALPHABET_CODE_VITRINE: ALPHABET_CODE_VITRINE,
+    CODES_VITRINE: CODES_VITRINE,
+    estCodeVitrine: estCodeVitrine,
+    codeVitrineEnNombre: codeVitrineEnNombre,
+    nombreEnCodeVitrine: nombreEnCodeVitrine,
+    changerOrigine: changerOrigine,
+    lienSuivi: lienSuivi,
+    lireSuivi: lireSuivi,
   };
 })(typeof self !== 'undefined' ? self : this);
