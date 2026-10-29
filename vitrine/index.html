@@ -880,6 +880,7 @@ return toQR;
   var SUIVI_APRES_SERVI = 30 * 60 * 1000;
   var ANDROID = /Android/i.test(navigator.userAgent);
   var VOIX = typeof window.speechSynthesis !== 'undefined' && typeof window.SpeechSynthesisUtterance !== 'undefined';
+  if (VOIX) { try { window.speechSynthesis.getVoices(); } catch (e) { /* les voix se chargent */ } }
   var GARDE = 'SigmaMarket ne vérifie ni les boutiques ni les prix. Ne paie qu’en main propre, ou à un numéro que tu connais.';
   var ARGENT = 'Rien n’est payé ici. Paie seulement en main propre, ou à un numéro que tu connais.';
   var MEME_PANIER = 'C’est le même panier : il ne sera pas compté deux fois.';
@@ -991,15 +992,55 @@ return toQR;
   function adressePage() {
     return location.href.split('#')[0].split('?')[0];
   }
+
+  /*
+   * La voix du navigateur (29 octobre, retour du propriétaire : « la voix ne marche pas ») : sur Chrome
+   * d'Android, un speak() lancé juste après cancel() est souvent perdu sans bruit, et un texte long
+   * s'arrête. On coupe le texte en phrases, on choisit une voix française si le téléphone en a une,
+   * et on parle un instant après l'arrêt de la phrase d'avant.
+   */
+  function voixFrancaise() {
+    try {
+      var vs = window.speechSynthesis.getVoices() || [];
+      for (var i = 0; i < vs.length; i++) if (/^fr/i.test(vs[i].lang)) return vs[i];
+    } catch (e) { /* rien */ }
+    return null;
+  }
+  function phrasesDe(texte) {
+    var morceaux = String(texte).replace(/\s+/g, ' ').match(/[^.!?…:;]+[.!?…:;]*/g) || [];
+    var sortie = [];
+    for (var i = 0; i < morceaux.length; i++) {
+      var m = morceaux[i].trim();
+      if (!m) continue;
+      while (m.length > 180) { var cut = m.lastIndexOf(',', 180); if (cut < 40) cut = m.lastIndexOf(' ', 180); if (cut < 40) cut = 180; sortie.push(m.slice(0, cut + 1)); m = m.slice(cut + 1).trim(); }
+      if (m) sortie.push(m);
+    }
+    return sortie;
+  }
+  function direTexte(texte) {
+    var s = window.speechSynthesis;
+    var occupee = false;
+    try { occupee = !!(s.speaking || s.pending); if (occupee) s.cancel(); } catch (e) { /* rien */ }
+    var voix = voixFrancaise();
+    var phrases = String(texte).length > 180 ? phrasesDe(texte) : [String(texte)];
+    var lancer = function () {
+      try {
+        if (s.paused) s.resume();
+        for (var i = 0; i < phrases.length; i++) {
+          var u = new window.SpeechSynthesisUtterance(phrases[i]);
+          u.lang = 'fr-FR';
+          u.rate = 0.95;
+          if (voix) u.voice = voix;
+          s.speak(u);
+        }
+      } catch (e) { /* pas de voix sur ce téléphone */ }
+    };
+    // Après un arrêt, Chrome d'Android perd la phrase lancée tout de suite : on attend un instant.
+    if (occupee) setTimeout(lancer, 120); else lancer();
+  }
   function parler(texte) {
     if (!VOIX) return;
-    try {
-      window.speechSynthesis.cancel();
-      var u = new window.SpeechSynthesisUtterance(texte);
-      u.lang = 'fr-FR';
-      u.rate = 0.95;
-      window.speechSynthesis.speak(u);
-    } catch (e) { /* pas de voix sur ce téléphone */ }
+    direTexte(texte);
   }
   function lire(cle) {
     try { return JSON.parse(window.localStorage.getItem(cle) || 'null'); } catch (e) { return null; }
