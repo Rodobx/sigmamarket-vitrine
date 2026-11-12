@@ -47,6 +47,7 @@ svg{display:block}
 .ecoute{flex:none;width:56px;height:56px;border-radius:28px;display:flex;align-items:center;justify-content:center;background:var(--ivoire);color:var(--indigo);box-shadow:0 2px 5px rgba(13,13,46,.4)}
 .ecoute .ico{width:30px;height:30px}
 .ecoute.parle{background:var(--indigo-vif);color:var(--ivoire)}
+.ecoute.muette{background:var(--rouge-clair);color:var(--rouge)}
 
 /* Bandeaux et cartes */
 .bandeau{margin:12px 16px 0;padding:10px 12px;border-radius:16px;background:var(--ivoire);border:1px solid var(--sable);font-size:15px;line-height:20px;font-weight:600;color:var(--encre-douce)}
@@ -880,7 +881,6 @@ return toQR;
   var SUIVI_APRES_SERVI = 30 * 60 * 1000;
   var ANDROID = /Android/i.test(navigator.userAgent);
   var VOIX = typeof window.speechSynthesis !== 'undefined' && typeof window.SpeechSynthesisUtterance !== 'undefined';
-  if (VOIX) { try { window.speechSynthesis.getVoices(); } catch (e) { /* les voix se chargent */ } }
   var GARDE = 'SigmaMarket ne vérifie ni les boutiques ni les prix. Ne paie qu’en main propre, ou à un numéro que tu connais.';
   var ARGENT = 'Rien n’est payé ici. Paie seulement en main propre, ou à un numéro que tu connais.';
   var MEME_PANIER = 'C’est le même panier : il ne sera pas compté deux fois.';
@@ -894,6 +894,7 @@ return toQR;
     alerte: 'M12 2.5L1.5 21h21zm-1.4 6.5h2.8v6h-2.8zm0 7.6h2.8v2.6h-2.8z',
     epuise: 'M12 2a10 10 0 100 20 10 10 0 000-20zm0 3a7 7 0 015.6 11.2L7.8 6.4A7 7 0 0112 5zm-7 7c0-1.6.5-3 1.4-4.2l9.8 9.8A7 7 0 015 12z',
     ecoute: 'M3 9v6h4l5 5V4L7 9zm13.5 3A4.5 4.5 0 0014 8v8a4.5 4.5 0 002.5-4zM14 3.2v2.1a7 7 0 010 13.4v2.1a9 9 0 000-17.6z',
+    muet: 'M3 9v6h4l5 5V4L7 9zM22.5 9.2l-.7-.7-2.8 2.8-2.8-2.8-.7.7 2.8 2.8-2.8 2.8.7.7 2.8-2.8 2.8 2.8.7-.7-2.8-2.8z',
     retour: 'M20 10.5H8.6l5.2-5.2L11.7 3.2 2.9 12l8.8 8.8 2.1-2.1-5.2-5.2H20z',
     panier: 'M5.6 8.5L9.2 3l1.7 1.1-2.9 4.4h8l-2.9-4.4L14.8 3l3.6 5.5H22l-2.2 11c-.2 1-1 1.5-2 1.5H6.2c-1 0-1.8-.5-2-1.5L2 8.5zM7 11.5v6h2v-6zm4 0v6h2v-6zm4 0v6h2v-6z',
     sac: 'M5.2 7.5h13.6l1.2 13.5H4zM8.5 7.5V7a3.5 3.5 0 017 0v.5h-2.2V7a1.3 1.3 0 00-2.6 0v.5z',
@@ -993,18 +994,30 @@ return toQR;
     return location.href.split('#')[0].split('?')[0];
   }
 
-  /*
-   * La voix du navigateur (29 octobre, retour du propriétaire : « la voix ne marche pas ») : sur Chrome
-   * d'Android, un speak() lancé juste après cancel() est souvent perdu sans bruit, et un texte long
-   * s'arrête. On coupe le texte en phrases, on choisit une voix française si le téléphone en a une,
-   * et on parle un instant après l'arrêt de la phrase d'avant.
-   */
+  /* La voix du navigateur (29 octobre : « la voix ne marche pas »). Sur Chrome d'Android : les voix arrivent après « voiceschanged » (on les relit à chaque toucher) ; une phrase à la fois (la file d'un coup se perd) ; sans voix française, un second essai ; si rien ne parle, le bouton le montre (haut-parleur barré). « not-allowed » n'est pas une absence de voix. */
+  var voixMuette = !VOIX;
+  var voixLecture = 0;
+  var voixSignal = function () { /* posé par le bouton d'écoute */ };
+  function voixDit(muette) {
+    if (voixMuette !== muette) { voixMuette = muette; voixSignal(); }
+  }
   function voixFrancaise() {
     try {
       var vs = window.speechSynthesis.getVoices() || [];
-      for (var i = 0; i < vs.length; i++) if (/^fr/i.test(vs[i].lang)) return vs[i];
-    } catch (e) { /* rien */ }
-    return null;
+      var bonne = null;
+      for (var i = 0; i < vs.length; i++) {
+        if (/^fr[-_]fr$/i.test(vs[i].lang)) return vs[i];
+        if (!bonne && /^fr/i.test(vs[i].lang)) bonne = vs[i];
+      }
+      return bonne;
+    } catch (e) { return null; }
+  }
+  function voixDeRepli() {
+    try {
+      var vs = window.speechSynthesis.getVoices() || [];
+      for (var i = 0; i < vs.length; i++) if (vs[i].default) return vs[i];
+      return vs[0] || null;
+    } catch (e) { return null; }
   }
   function phrasesDe(texte) {
     var morceaux = String(texte).replace(/\s+/g, ' ').match(/[^.!?…:;]+[.!?…:;]*/g) || [];
@@ -1019,28 +1032,69 @@ return toQR;
   }
   function direTexte(texte) {
     var s = window.speechSynthesis;
-    var occupee = false;
-    try { occupee = !!(s.speaking || s.pending); if (occupee) s.cancel(); } catch (e) { /* rien */ }
-    var voix = voixFrancaise();
+    var lecture = ++voixLecture;
     var phrases = String(texte).length > 180 ? phrasesDe(texte) : [String(texte)];
-    var lancer = function () {
+    var rang = 0;
+    var parle = false;
+    var repli = false;
+    var minuteur = null;
+    function dire() {
+      if (lecture !== voixLecture || rang >= phrases.length) return;
+      var u = new window.SpeechSynthesisUtterance(phrases[rang]);
+      u.rate = 0.95;
+      var voix = repli ? voixDeRepli() : voixFrancaise();
+      if (!repli) u.lang = 'fr-FR';
+      if (voix) u.voice = voix;
+      u.onstart = function () {
+        if (lecture !== voixLecture) return;
+        parle = true;
+        if (minuteur) clearTimeout(minuteur);
+        voixDit(false);
+      };
+      u.onend = function () {
+        if (lecture !== voixLecture) return;
+        rang++;
+        dire();
+      };
+      u.onerror = function (ev) {
+        if (lecture !== voixLecture) return;
+        var e = ev && ev.error;
+        if (e === 'interrupted' || e === 'canceled' || e === 'not-allowed') return;
+        if (parle) { rang++; dire(); return; }
+        if (!repli) { repli = true; dire(); return; }
+        voixDit(true);
+      };
       try {
-        if (s.paused) s.resume();
-        for (var i = 0; i < phrases.length; i++) {
-          var u = new window.SpeechSynthesisUtterance(phrases[i]);
-          u.lang = 'fr-FR';
-          u.rate = 0.95;
-          if (voix) u.voice = voix;
-          s.speak(u);
+        s.speak(u);
+        if (!parle) {
+          if (minuteur) clearTimeout(minuteur);
+          // Rien n'a commencé en 3 secondes et rien ne parle : ce téléphone n'a pas de voix.
+          minuteur = setTimeout(function () {
+            var occupe = false;
+            try { occupe = !!s.speaking; } catch (e) { /* rien */ }
+            if (lecture === voixLecture && !parle && !occupe) voixDit(true);
+          }, 3000);
         }
-      } catch (e) { /* pas de voix sur ce téléphone */ }
+      } catch (e) { voixDit(true); }
+    }
+    var occupee = false;
+    try { occupee = !!(s.speaking || s.pending || s.paused); if (occupee) s.cancel(); } catch (e) { /* rien */ }
+    var lancer = function () {
+      if (lecture !== voixLecture) return;
+      try { if (s.paused) s.resume(); } catch (e) { /* rien */ }
+      dire();
     };
     // Après un arrêt, Chrome d'Android perd la phrase lancée tout de suite : on attend un instant.
-    if (occupee) setTimeout(lancer, 120); else lancer();
+    if (occupee) setTimeout(lancer, 150); else lancer();
   }
   function parler(texte) {
-    if (!VOIX) return;
+    if (!VOIX) { vibrer(); return; }
     direTexte(texte);
+  }
+  if (VOIX) {
+    try {
+      window.speechSynthesis.getVoices();
+    } catch (e) { /* les voix se chargent */ }
   }
   function lire(cle) {
     try { return JSON.parse(window.localStorage.getItem(cle) || 'null'); } catch (e) { return null; }
@@ -1097,15 +1151,25 @@ return toQR;
     return svg;
   }
 
+  /** Le bouton d'écoute : haut-parleur, ou haut-parleur barré (rouge) quand ce téléphone n'a pas de voix. */
+  var ecouteCourante = null;
+  function peindreEcoute(b) {
+    b.setAttribute('class', 'ecoute' + (voixMuette ? ' muette' : ''));
+    b.textContent = '';
+    b.appendChild(icone(voixMuette ? 'muet' : 'ecoute'));
+    ecouteCourante = b;
+  }
+  voixSignal = function () { if (ecouteCourante) peindreEcoute(ecouteCourante); };
+
   /** En-tête : pastille (ou retour), titre, bouton d'écoute. */
   function entete(titre, dessin, auRetour, texteAEcouter) {
     var avant = auRetour
       ? h('button', { class: 'avant', 'aria-label': 'Retour', onclick: auRetour }, [h('span', { class: 'pastille retour' }, [icone('retour')])])
       : h('div', { class: 'avant' }, [h('span', { class: 'pastille' }, [icone(dessin)])]);
-    var ecoute = VOIX ? h('button', {
-      class: 'ecoute', 'aria-label': 'Écouter',
+    var ecoute = h('button', { class: 'ecoute', 'aria-label': 'Écouter',
       onclick: function () { parler(typeof texteAEcouter === 'function' ? texteAEcouter() : texteAEcouter); },
-    }, [icone('ecoute')]) : null;
+    }, [icone('ecoute')]);
+    peindreEcoute(ecoute);
     return h('header', { class: 'entete' }, [motif(), avant, h('h1', { class: 'titre' }, [titre]), ecoute]);
   }
 
@@ -1434,7 +1498,7 @@ return toQR;
   }
   function texteVitrine() {
     var l = lignes();
-    var texte = sansCoche(etat.cat.boutique) + '. ' + etat.texteJour + (etat.ligne
+    var texte = sansCoche(etat.cat.boutique) + '. ' + (etat.cat.articles.length ? '' : texteSansArticle() + ' ') + etat.texteJour + (etat.ligne
       ? 'Choisis tes articles avec le bouton plus, puis touche Commander. Rien à payer ici.'
       : 'Choisis tes articles avec le bouton plus, puis touche Valider.');
     if (etat.repris && !etat.ligne) texte += ' Tu as déjà montré ce panier. Pour en faire un autre, touche Nouveau panier.';
@@ -1490,8 +1554,11 @@ return toQR;
       etat.tuiles[a.numero] = t;
       grille.appendChild(t);
     });
-    if (!etat.cat.articles.length) grille.appendChild(h('p', { class: 'vide' }, ['Pas d’article pour le moment.']));
+    if (!etat.cat.articles.length) grille.appendChild(h('p', { class: 'vide' }, [texteSansArticle()]));
     return grille;
+  }
+  function texteSansArticle() {
+    return etat.cat.enLigne ? 'Pas de réseau. Montre ce code au vendeur, ou écris-lui.' : 'Pas d’article pour le moment.';
   }
 
   // ------------------------------------------------------------ le panier, à montrer ou à envoyer
@@ -3066,6 +3133,9 @@ return toQR;
     } else if (p.etat === 'annule') {
       boutons.push(h('button', { class: 'bouton valider large espace', onclick: function () { refaire(lignesDe, []); } }, [icone('recommencer'), 'Refaire un panier']));
     } else {
+      if (vendu && catalogueConnu()) {
+        boutons.push(h('button', { class: 'bouton neutre large espace', onclick: revenirALaVitrine }, [icone('sac'), 'Revenir à la boutique']));
+      }
       if (p.etat === 'expire' && wa) {
         boutons.push(h('a', { class: 'bouton valider large espace', rel: 'noopener noreferrer', href: F.lienWhatsApp(wa, 'Bonjour, j’avais envoyé le panier n° ' + p.numero + ' sur ta vitrine.') }, [icone('whatsapp'), 'Lui écrire sur WhatsApp']));
       }

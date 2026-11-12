@@ -45,6 +45,7 @@ svg{display:block}
 .ecoute{flex:none;width:56px;height:56px;border-radius:28px;display:flex;align-items:center;justify-content:center;background:var(--ivoire);color:var(--indigo);box-shadow:0 2px 5px rgba(13,13,46,.4)}
 .ecoute .ico{width:30px;height:30px}
 .ecoute.parle{background:var(--indigo-vif);color:var(--ivoire)}
+.ecoute.muette{background:var(--rouge-clair);color:var(--rouge)}
 
 /* Bandeaux et cartes */
 .bandeau{margin:12px 16px 0;padding:10px 12px;border-radius:16px;background:var(--ivoire);border:1px solid var(--sable);font-size:15px;line-height:20px;font-weight:600;color:var(--encre-douce)}
@@ -255,6 +256,7 @@ noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text
     alerte: 'M12 2.5L1.5 21h21zm-1.4 6.5h2.8v6h-2.8zm0 7.6h2.8v2.6h-2.8z',
     epuise: 'M12 2a10 10 0 100 20 10 10 0 000-20zm0 3a7 7 0 015.6 11.2L7.8 6.4A7 7 0 0112 5zm-7 7c0-1.6.5-3 1.4-4.2l9.8 9.8A7 7 0 015 12z',
     ecoute: 'M3 9v6h4l5 5V4L7 9zm13.5 3A4.5 4.5 0 0014 8v8a4.5 4.5 0 002.5-4zM14 3.2v2.1a7 7 0 010 13.4v2.1a9 9 0 000-17.6z',
+    muet: 'M3 9v6h4l5 5V4L7 9zM22.5 9.2l-.7-.7-2.8 2.8-2.8-2.8-.7.7 2.8 2.8-2.8 2.8.7.7 2.8-2.8 2.8 2.8.7-.7-2.8-2.8z',
     retour: 'M20 10.5H8.6l5.2-5.2L11.7 3.2 2.9 12l8.8 8.8 2.1-2.1-5.2-5.2H20z',
     panier: 'M5.6 8.5L9.2 3l1.7 1.1-2.9 4.4h8l-2.9-4.4L14.8 3l3.6 5.5H22l-2.2 11c-.2 1-1 1.5-2 1.5H6.2c-1 0-1.8-.5-2-1.5L2 8.5zM7 11.5v6h2v-6zm4 0v6h2v-6zm4 0v6h2v-6z',
     horloge: 'M12 2a10 10 0 100 20 10 10 0 000-20zm0 2.5a7.5 7.5 0 110 15 7.5 7.5 0 010-15zM10.8 7h2.4v4.4l3.4 2-1.2 2.1-4.6-2.7z',
@@ -357,15 +359,107 @@ noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text
   function vibrer() {
     try { if (navigator.vibrate) navigator.vibrate(200); } catch (e) { /* rien */ }
   }
-  function parler(texte) {
-    if (!VOIX) return;
+  /* La voix du navigateur (29 octobre : « la voix ne marche pas »). Sur Chrome d'Android : les voix arrivent après « voiceschanged » (on les relit à chaque toucher) ; une phrase à la fois (la file d'un coup se perd) ; sans voix française, un second essai ; si rien ne parle, le bouton le montre (haut-parleur barré). « not-allowed » n'est pas une absence de voix. */
+  var voixMuette = !VOIX;
+  var voixLecture = 0;
+  var voixSignal = function () { /* posé par le bouton d'écoute */ };
+  function voixDit(muette) {
+    if (voixMuette !== muette) { voixMuette = muette; voixSignal(); }
+  }
+  function voixFrancaise() {
     try {
-      window.speechSynthesis.cancel();
-      var u = new window.SpeechSynthesisUtterance(texte);
-      u.lang = 'fr-FR';
+      var vs = window.speechSynthesis.getVoices() || [];
+      var bonne = null;
+      for (var i = 0; i < vs.length; i++) {
+        if (/^fr[-_]fr$/i.test(vs[i].lang)) return vs[i];
+        if (!bonne && /^fr/i.test(vs[i].lang)) bonne = vs[i];
+      }
+      return bonne;
+    } catch (e) { return null; }
+  }
+  function voixDeRepli() {
+    try {
+      var vs = window.speechSynthesis.getVoices() || [];
+      for (var i = 0; i < vs.length; i++) if (vs[i].default) return vs[i];
+      return vs[0] || null;
+    } catch (e) { return null; }
+  }
+  function phrasesDe(texte) {
+    var morceaux = String(texte).replace(/\s+/g, ' ').match(/[^.!?…:;]+[.!?…:;]*/g) || [];
+    var sortie = [];
+    for (var i = 0; i < morceaux.length; i++) {
+      var m = morceaux[i].trim();
+      if (!m) continue;
+      while (m.length > 180) { var cut = m.lastIndexOf(',', 180); if (cut < 40) cut = m.lastIndexOf(' ', 180); if (cut < 40) cut = 180; sortie.push(m.slice(0, cut + 1)); m = m.slice(cut + 1).trim(); }
+      if (m) sortie.push(m);
+    }
+    return sortie;
+  }
+  function direTexte(texte) {
+    var s = window.speechSynthesis;
+    var lecture = ++voixLecture;
+    var phrases = String(texte).length > 180 ? phrasesDe(texte) : [String(texte)];
+    var rang = 0;
+    var parle = false;
+    var repli = false;
+    var minuteur = null;
+    function dire() {
+      if (lecture !== voixLecture || rang >= phrases.length) return;
+      var u = new window.SpeechSynthesisUtterance(phrases[rang]);
       u.rate = 0.95;
-      window.speechSynthesis.speak(u);
-    } catch (e) { /* pas de voix sur ce téléphone */ }
+      var voix = repli ? voixDeRepli() : voixFrancaise();
+      if (!repli) u.lang = 'fr-FR';
+      if (voix) u.voice = voix;
+      u.onstart = function () {
+        if (lecture !== voixLecture) return;
+        parle = true;
+        if (minuteur) clearTimeout(minuteur);
+        voixDit(false);
+      };
+      u.onend = function () {
+        if (lecture !== voixLecture) return;
+        rang++;
+        dire();
+      };
+      u.onerror = function (ev) {
+        if (lecture !== voixLecture) return;
+        var e = ev && ev.error;
+        if (e === 'interrupted' || e === 'canceled' || e === 'not-allowed') return;
+        if (parle) { rang++; dire(); return; }
+        if (!repli) { repli = true; dire(); return; }
+        voixDit(true);
+      };
+      try {
+        s.speak(u);
+        if (!parle) {
+          if (minuteur) clearTimeout(minuteur);
+          // Rien n'a commencé en 3 secondes et rien ne parle : ce téléphone n'a pas de voix.
+          minuteur = setTimeout(function () {
+            var occupe = false;
+            try { occupe = !!s.speaking; } catch (e) { /* rien */ }
+            if (lecture === voixLecture && !parle && !occupe) voixDit(true);
+          }, 3000);
+        }
+      } catch (e) { voixDit(true); }
+    }
+    var occupee = false;
+    try { occupee = !!(s.speaking || s.pending || s.paused); if (occupee) s.cancel(); } catch (e) { /* rien */ }
+    var lancer = function () {
+      if (lecture !== voixLecture) return;
+      try { if (s.paused) s.resume(); } catch (e) { /* rien */ }
+      dire();
+    };
+    // Après un arrêt, Chrome d'Android perd la phrase lancée tout de suite : on attend un instant.
+    if (occupee) setTimeout(lancer, 150); else lancer();
+  }
+  function parler(texte) {
+    if (!VOIX) { vibrer(); return; }
+    direTexte(texte);
+  }
+  if (VOIX) {
+    try {
+      window.speechSynthesis.getVoices();
+    } catch (e) { /* les voix se chargent */ }
   }
   function lire(cle) {
     try { return window.localStorage.getItem(STOCKAGE + cle); } catch (e) { return null; }
@@ -448,14 +542,24 @@ noscript p{margin:32px 16px;font-size:20px;line-height:26px;font-weight:700;text
     return etat.live ? Math.round(etat.live.delai_ms / 60000) : 0;
   }
 
+  /** Le bouton d'écoute : haut-parleur, ou haut-parleur barré (rouge) quand ce téléphone n'a pas de voix. */
+  var ecouteCourante = null;
+  function peindreEcoute(b) {
+    b.setAttribute('class', 'ecoute' + (voixMuette ? ' muette' : ''));
+    b.textContent = '';
+    b.appendChild(icone(voixMuette ? 'muet' : 'ecoute'));
+    ecouteCourante = b;
+  }
+  voixSignal = function () { if (ecouteCourante) peindreEcoute(ecouteCourante); };
+
   function entete(titre, auRetour, texteAEcouter) {
     var avant = auRetour
       ? h('button', { class: 'avant', 'aria-label': 'Retour', onclick: auRetour }, [h('span', { class: 'pastille retour' }, [icone('retour')])])
       : h('div', { class: 'avant' }, [h('span', { class: 'pastille' }, [icone('direct')])]);
-    var ecoute = VOIX ? h('button', {
-      class: 'ecoute', 'aria-label': 'Écouter',
+    var ecoute = h('button', { class: 'ecoute', 'aria-label': 'Écouter',
       onclick: function () { parler(typeof texteAEcouter === 'function' ? texteAEcouter() : texteAEcouter); },
-    }, [icone('ecoute')]) : null;
+    }, [icone('ecoute')]);
+    peindreEcoute(ecoute);
     return h('header', { class: 'entete' }, [avant, h('h1', { class: 'titre' }, [titre]), ecoute]);
   }
   function bandeauMessage() {
